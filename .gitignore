@@ -1,3 +1,5 @@
 # compilation output
 sftpgo
 sftpgo.exe
+sftpgo.db
+.credentials

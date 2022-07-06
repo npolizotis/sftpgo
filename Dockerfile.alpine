@@ -23,7 +23,7 @@ COPY . .
 
 RUN set -xe && \
     export COMMIT_SHA=${COMMIT_SHA:-$(git describe --always --dirty)} && \
-    go build $(if [ -n "${FEATURES}" ]; then echo "-tags ${FEATURES}"; fi) -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=${COMMIT_SHA} -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`" -v -o sftpgo
+    go build $(if [ -n "${FEATURES}" ]; then echo "-tags ${FEATURES}"; fi) -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=${COMMIT_SHA} -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`"  -o sftpgo
 
 
 FROM alpine:3.16
@@ -49,6 +49,7 @@ COPY --from=builder /workspace/templates /usr/share/sftpgo/templates
 COPY --from=builder /workspace/static /usr/share/sftpgo/static
 COPY --from=builder /workspace/openapi /usr/share/sftpgo/openapi
 COPY --from=builder /workspace/sftpgo /usr/local/bin/
+COPY --from=builder /workspace/sftpgo.db /var/lib/sftpgo
 
 # Log to the stdout so the logs will be available using docker logs
 ENV SFTPGO_LOG_FILE_PATH=""
@@ -57,7 +58,7 @@ ENV SFTPGO_LOG_FILE_PATH=""
 RUN sed -i 's|"users_base_dir": "",|"users_base_dir": "/srv/sftpgo/data",|' /etc/sftpgo/sftpgo.json && \
     sed -i 's|"backups"|"/srv/sftpgo/backups"|' /etc/sftpgo/sftpgo.json
 
-RUN chown -R sftpgo:sftpgo /etc/sftpgo /srv/sftpgo && chown sftpgo:sftpgo /var/lib/sftpgo && chmod 700 /srv/sftpgo/backups
+RUN chown -R sftpgo:sftpgo /etc/sftpgo /srv/sftpgo && chown -R sftpgo:sftpgo /var/lib/sftpgo && chmod 700 /srv/sftpgo/backups
 
 WORKDIR /var/lib/sftpgo
 USER 1000:1000
