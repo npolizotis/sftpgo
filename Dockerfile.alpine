@@ -22,6 +22,7 @@ ARG FEATURES
 COPY . .
 
 RUN set -xe && \
+	git config --global --add safe.directory /workspace && \
     export COMMIT_SHA=${COMMIT_SHA:-$(git describe --always --dirty)} && \
     go build $(if [ -n "${FEATURES}" ]; then echo "-tags ${FEATURES}"; fi) -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=${COMMIT_SHA} -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`"  -o sftpgo
 
