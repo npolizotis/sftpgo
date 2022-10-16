@@ -1,2 +1,4 @@
 fly.toml
 .credentials
+nikos*
+*.env

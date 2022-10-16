@@ -5,3 +5,4 @@ sftpgo.db
 .credentials
 nikos-sftp
 nikos-sftp.pub
+*.env
