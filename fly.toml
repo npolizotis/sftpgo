@@ -10,7 +10,7 @@ processes = []
 dockerfile = "Dockerfile.alpine"
 
 [build.args]
-FEATURES= "nos3,nogcs"
+#FEATURES= "nos3,nogcs"
 INSTALL_OPTIONAL_PACKAGES="true"
 
 [env]
