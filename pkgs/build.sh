@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NFPM_VERSION=2.16.0
+NFPM_VERSION=2.20.0
 NFPM_ARCH=${NFPM_ARCH:-amd64}
 if [ -z ${SFTPGO_VERSION} ]
 then
@@ -91,6 +91,9 @@ contents:
     type: dir
 
   - dst: "/var/lib/sftpgo"
+    type: dir
+
+  - dst: "/etc/sftpgo/env.d"
     type: dir
 
 overrides:

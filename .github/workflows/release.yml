@@ -5,7 +5,7 @@ on:
     tags: 'v*'
 
 env:
-  GO_VERSION: 1.18.3
+  GO_VERSION: 1.19.2
 
 jobs:
   prepare-sources-with-deps:
@@ -20,12 +20,13 @@ jobs:
 
       - name: Get SFTPGo version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
 
       - name: Prepare release
         run: |
           go mod vendor
           echo "${SFTPGO_VERSION}" > VERSION.txt
+          echo "${GITHUB_SHA::8}" >> VERSION.txt
           tar cJvf sftpgo_${SFTPGO_VERSION}_src_with_deps.tar.xz *
         env:
           SFTPGO_VERSION: ${{ steps.get_version.outputs.VERSION }}
@@ -53,7 +54,7 @@ jobs:
 
       - name: Get SFTPGo version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Get OS name
@@ -61,9 +62,9 @@ jobs:
         run: |
           if [[ $MATRIX_OS =~ ^macos.* ]]
           then
-            echo ::set-output name=OS::macOS
+            echo "OS=macOS" >> $GITHUB_OUTPUT
           else
-            echo ::set-output name=OS::windows
+            echo "OS=windows" >> $GITHUB_OUTPUT
           fi
         shell: bash
         env:
@@ -71,31 +72,31 @@ jobs:
 
       - name: Build for macOS x86_64
         if: startsWith(matrix.os, 'windows-') != true
-        run: go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=`git describe --always --dirty` -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`" -o sftpgo
+        run: go build -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=`git describe --always --abbrev=8 --dirty` -X github.com/drakkan/sftpgo/v2/internal/version.date=`date -u +%FT%TZ`" -o sftpgo
 
       - name: Build for macOS arm64
         if: startsWith(matrix.os, 'macos-') == true
-        run: CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 SDKROOT=$(xcrun --sdk macosx --show-sdk-path) go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=`git describe --always --dirty` -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`" -o sftpgo_arm64
+        run: CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 SDKROOT=$(xcrun --sdk macosx --show-sdk-path) go build -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=`git describe --always --abbrev=8 --dirty` -X github.com/drakkan/sftpgo/v2/internal/version.date=`date -u +%FT%TZ`" -o sftpgo_arm64
 
       - name: Build for Windows
         if: startsWith(matrix.os, 'windows-')
         run: |
-          $GIT_COMMIT = (git describe --always --dirty) | Out-String
+          $GIT_COMMIT = (git describe --always --abbrev=8 --dirty) | Out-String
           $DATE_TIME = ([datetime]::Now.ToUniversalTime().toString("yyyy-MM-ddTHH:mm:ssZ")) | Out-String
           $FILE_VERSION = $Env:SFTPGO_VERSION.substring(1)  + ".0"
           go install github.com/tc-hib/go-winres@latest
           go-winres simply --arch amd64 --product-version $Env:SFTPGO_VERSION-$GIT_COMMIT --file-version $FILE_VERSION --file-description "SFTPGo server" --product-name SFTPGo --copyright "AGPL-3.0" --original-filename sftpgo.exe --icon  .\windows-installer\icon.ico
-          go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/version.date=$DATE_TIME" -o sftpgo.exe
+          go build -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/internal/version.date=$DATE_TIME" -o sftpgo.exe
           mkdir arm64
           $Env:CGO_ENABLED='0'
           $Env:GOOS='windows'
           $Env:GOARCH='arm64'
           go-winres simply --arch arm64 --product-version $Env:SFTPGO_VERSION-$GIT_COMMIT --file-version $FILE_VERSION --file-description "SFTPGo server" --product-name SFTPGo --copyright "AGPL-3.0" --original-filename sftpgo.exe --icon  .\windows-installer\icon.ico
-          go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/version.date=$DATE_TIME" -o .\arm64\sftpgo.exe
+          go build -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/internal/version.date=$DATE_TIME" -o .\arm64\sftpgo.exe
           mkdir x86
           $Env:GOARCH='386'
           go-winres simply --arch 386 --product-version $Env:SFTPGO_VERSION-$GIT_COMMIT --file-version $FILE_VERSION --file-description "SFTPGo server" --product-name SFTPGo --copyright "AGPL-3.0" --original-filename sftpgo.exe --icon  .\windows-installer\icon.ico
-          go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/version.date=$DATE_TIME" -o .\x86\sftpgo.exe
+          go build -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=$GIT_COMMIT -X github.com/drakkan/sftpgo/v2/internal/version.date=$DATE_TIME" -o .\x86\sftpgo.exe
           Remove-Item Env:\CGO_ENABLED
           Remove-Item Env:\GOOS
           Remove-Item Env:\GOARCH
@@ -254,11 +255,12 @@ jobs:
 
   prepare-linux:
     name: Prepare Linux binaries
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - arch: amd64
+            distro: ubuntu:18.04
             go-arch: amd64
             deb-arch: amd64
             rpm-arch: x86_64
@@ -284,17 +286,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Go
-        if: ${{ matrix.arch == 'amd64' }}
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Get versions
         id: get_version
         run: |
-          echo ::set-output name=SFTPGO_VERSION::${GITHUB_REF/refs\/tags\//}
-          echo ::set-output name=GO_VERSION::${GO_VERSION}
+          echo "SFTPGO_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+          echo "GO_VERSION=${GO_VERSION}" >> $GITHUB_OUTPUT
+          echo "COMMIT=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
         shell: bash
         env:
           GO_VERSION: ${{ env.GO_VERSION }}
@@ -302,7 +300,20 @@ jobs:
       - name: Build on amd64
         if: ${{ matrix.arch == 'amd64' }}
         run: |
-          go build -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=`git describe --always --dirty` -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`" -o sftpgo
+          echo '#!/bin/bash' > build.sh
+          echo '' >> build.sh
+          echo 'set -e' >> build.sh
+          echo 'apt-get update -q -y' >> build.sh
+          echo 'apt-get install -q -y curl gcc' >> build.sh
+          echo 'curl --retry 5 --retry-delay 2 --connect-timeout 10 -o go.tar.gz -L https://go.dev/dl/go${{ steps.get_version.outputs.GO_VERSION }}.linux-${{ matrix.go-arch }}.tar.gz' >> build.sh
+          echo 'tar -C /usr/local -xzf go.tar.gz' >> build.sh
+          echo 'export PATH=$PATH:/usr/local/go/bin' >> build.sh
+          echo 'go version' >> build.sh
+          echo 'cd /usr/local/src' >> build.sh
+          echo 'go build -buildvcs=false -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=${{ steps.get_version.outputs.COMMIT }} -X github.com/drakkan/sftpgo/v2/internal/version.date=`date -u +%FT%TZ`" -o sftpgo' >> build.sh
+
+          chmod 755 build.sh
+          docker run --rm --name ubuntu-build --mount type=bind,source=`pwd`,target=/usr/local/src ${{ matrix.distro }} /usr/local/src/build.sh
           mkdir -p output/{init,sqlite,bash_completion,zsh_completion}
           echo "For documentation please take a look here:" > output/README.txt
           echo "" >> output/README.txt
@@ -340,7 +351,7 @@ jobs:
           shell: /bin/bash
           install: |
             apt-get update -q -y
-            apt-get install -q -y curl gcc git xz-utils
+            apt-get install -q -y curl gcc xz-utils
             GO_DOWNLOAD_ARCH=${{ matrix.go-arch }}
             if [ ${{ matrix.arch}} == 'armv7' ]
             then
@@ -350,7 +361,8 @@ jobs:
             tar -C /usr/local -xzf go.tar.gz
           run: |
             export PATH=$PATH:/usr/local/go/bin
-            go build -buildvcs=false -trimpath -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/version.commit=`git describe --always --dirty` -X github.com/drakkan/sftpgo/v2/version.date=`date -u +%FT%TZ`" -o sftpgo
+            go version
+            go build -buildvcs=false -trimpath -tags nopgxregisterdefaulttypes -ldflags "-s -w -X github.com/drakkan/sftpgo/v2/internal/version.commit=${{ steps.get_version.outputs.COMMIT }} -X github.com/drakkan/sftpgo/v2/internal/version.date=`date -u +%FT%TZ`" -o sftpgo
             mkdir -p output/{init,sqlite,bash_completion,zsh_completion}
             echo "For documentation please take a look here:" > output/README.txt
             echo "" >> output/README.txt
@@ -386,7 +398,7 @@ jobs:
           cd pkgs
           ./build.sh
           PKG_VERSION=${SFTPGO_VERSION:1}
-          echo "::set-output name=pkg-version::${PKG_VERSION}"
+          echo "pkg-version=${PKG_VERSION}" >> $GITHUB_OUTPUT
         env:
           SFTPGO_VERSION: ${{ steps.get_version.outputs.SFTPGO_VERSION }}
 
@@ -413,7 +425,7 @@ jobs:
       - name: Get versions
         id: get_version
         run: |
-          echo ::set-output name=SFTPGO_VERSION::${GITHUB_REF/refs\/tags\//}
+          echo "SFTPGO_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Download amd64 artifact
@@ -473,8 +485,8 @@ jobs:
         run: |
           SFTPGO_VERSION=${GITHUB_REF/refs\/tags\//}
           PKG_VERSION=${SFTPGO_VERSION:1}
-          echo ::set-output name=SFTPGO_VERSION::${SFTPGO_VERSION}
-          echo "::set-output name=PKG_VERSION::${PKG_VERSION}"
+          echo "SFTPGO_VERSION=${SFTPGO_VERSION}" >> $GITHUB_OUTPUT
+          echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Download amd64 artifact

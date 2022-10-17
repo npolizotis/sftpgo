@@ -1,8 +1,8 @@
 ﻿$ErrorActionPreference  = 'Stop'
 $packageName    = 'sftpgo'
 $softwareName   = 'SFTPGo'
-$url            = 'https://github.com/drakkan/sftpgo/releases/download/v2.3.1/sftpgo_v2.3.1_windows_x86_64.exe'
-$checksum       = '1F9355C8CADC44C837028CA1F6679E913F0AC5D9873E81FD9B8195BB01F1B793'
+$url            = 'https://github.com/drakkan/sftpgo/releases/download/v2.3.6/sftpgo_v2.3.6_windows_x86_64.exe'
+$checksum       = 'A0247EE43FECC7D54504D0638631FAEFB223EF00FD2B10EEE988A2CCC9A014EA'
 $silentArgs     = '/VERYSILENT'
 $validExitCodes = @(0)
 
@@ -22,6 +22,7 @@ Install-ChocolateyPackage @packageArgs
 
 $DefaultDataPath = Join-Path -Path $ENV:ProgramData -ChildPath "SFTPGo"
 $DefaultConfigurationFilePath = Join-Path -Path $DefaultDataPath -ChildPath "sftpgo.json"
+$EnvDirPath = Join-Path -Path $DefaultDataPath -ChildPath "env.d"
 
 # `t = tab
 Write-Output "---------------------------"
@@ -38,15 +39,16 @@ Write-Output "Default data location:"
 Write-Output "`t$DefaultDataPath"
 Write-Output "Default configuration file location:"
 Write-Output "`t$DefaultConfigurationFilePath"
-Write-Output ""
+Write-Output "Directory to create environment variable files to set custom configurations:"
+Write-Output "`t$EnvDirPath"
 Write-Output "If the SFTPGo service does not start, make sure that TCP ports 2022 and 8080 are"
 Write-Output "not used by other services or change the SFTPGo configuration to suit your needs."
 Write-Output ""
 Write-Output "General information (README) location:"
 Write-Output "`thttps://github.com/drakkan/sftpgo"
-Write-Output "Getting start guide location:"
-Write-Output "`thttps://github.com/drakkan/sftpgo/blob/v2.3.1/docs/howto/getting-started.md"
+Write-Output "Getting started guide location:"
+Write-Output "`thttps://github.com/drakkan/sftpgo/blob/v2.3.6/docs/howto/getting-started.md"
 Write-Output "Detailed information (docs folder) location:"
-Write-Output "`thttps://github.com/drakkan/sftpgo/tree/v2.3.1/docs"
+Write-Output "`thttps://github.com/drakkan/sftpgo/tree/v2.3.6/docs"
 Write-Output ""
 Write-Output "---------------------------"

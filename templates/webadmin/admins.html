@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{template "base" .}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -39,6 +54,7 @@
                         <th>Allow list</th>
                         <th>Email</th>
                         <th>Description</th>
+                        <th>Groups for users</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,6 +69,7 @@
                         <td>{{.GetAllowedIPAsString}}</td>
                         <td>{{.Email}}</td>
                         <td>{{.Description}}</td>
+                        <td>{{.GetGroupsAsString}}</td>
                     </tr>
                     {{end}}
 
@@ -217,6 +234,11 @@
                 },
                 {
                     "targets": [5,7,8],
+                    "visible": false,
+                },
+                {
+                    "targets": [9],
+                    "render": $.fn.dataTable.render.ellipsis(50, true),
                     "visible": false,
                 }
             ],

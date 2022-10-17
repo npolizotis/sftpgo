@@ -11,6 +11,39 @@
 Fully featured and highly configurable SFTP server with optional HTTP/S, FTP/S and WebDAV support.
 Several storage backends are supported: local filesystem, encrypted local filesystem, S3 (compatible) Object Storage, Google Cloud Storage, Azure Blob Storage, SFTP.
 
+## Sponsors
+
+If you find SFTPGo useful please consider supporting this Open Source project.
+
+Maintaining and evolving SFTPGo is a lot of work - easily the equivalent of a full time job - for me.
+
+I'd like to make SFTPGo into a sustainable long term project and would not like to introduce a dual licensing option and limit some features to the proprietary version only.
+
+If you use SFTPGo, it is in your best interest to ensure that the project you rely on stays healthy and well maintained.
+This can only happen with your donations and [sponsorships](https://github.com/sponsors/drakkan) :heart:
+
+If you just take and don't return anything back, the project will die in the long run and you will be forced to pay for a similar proprietary solution.
+
+More [info](https://github.com/drakkan/sftpgo/issues/452).
+
+### Thank you to our sponsors
+
+#### Platinum sponsors
+
+[<img src="./img/Aledade_logo.png" alt="Aledade logo" width="202" height="70">](https://www.aledade.com/)
+
+#### Bronze sponsors
+
+[<img src="https://www.7digital.com/wp-content/themes/sevendigital/images/top_logo.png" alt="7digital logo">](https://www.7digital.com/)
+
+## Support policy
+
+SFTPGo is an Open Source project and you can of course use it for free but please don't ask for free support as well.
+
+We will check the reported issues to see if you are experiencing a bug and if so we'll will fix it, but will only provide support to project [sponsors/donors](#sponsors).
+
+If you report an invalid issue or ask for step-by-step support, your issue will remain open with no answer or will be closed as invalid without further explanation. Thanks for understanding.
+
 ## Features
 
 - Support for serving local filesystem, encrypted local filesystem, S3 Compatible Object Storage, Google Cloud Storage, Azure Blob Storage or other SFTP accounts over SFTP/SCP/FTP/WebDAV.
@@ -21,6 +54,7 @@ Several storage backends are supported: local filesystem, encrypted local filesy
 - Chroot isolation for local accounts. Cloud-based accounts can be restricted to a certain base path.
 - Per-user and per-directory virtual permissions, for each exposed path you can allow or deny: directory listing, upload, overwrite, download, delete, rename, create directories, create symlinks, change owner/group/file mode and modification time.
 - [REST API](./docs/rest-api.md) for users and folders management, data retention, backup, restore and real time reports of the active connections with possibility of forcibly closing a connection.
+- The [Event Manager](./docs/eventmanager.md) allows to define custom workflows based on server events or schedules.
 - [Web based administration interface](./docs/web-admin.md) to easily manage users, folders and connections.
 - [Web client interface](./docs/web-client.md) so that end users can change their credentials, manage and share their files in the browser.
 - Public key and password authentication. Multiple public keys per-user are supported.
@@ -70,8 +104,10 @@ SFTPGo is developed and tested on Linux. After each commit, the code is automati
 ## Requirements
 
 - Go as build only dependency. We support the Go version(s) used in [continuous integration workflows](./.github/workflows).
-- A suitable SQL server to use as data provider: PostgreSQL 9.4+, MySQL 5.6+, SQLite 3.x, CockroachDB stable.
-- The SQL server is optional: you can choose to use an embedded bolt database as key/value store or an in memory data provider.
+- A suitable SQL server to use as data provider:
+  - upstream supported versions of PostgreSQL, MySQL and MariaDB.
+  - CockroachDB stable.
+- The SQL server is optional: you can choose to use an embedded SQLite, bolt or in memory data provider.
 
 ## Installation
 
@@ -95,7 +131,13 @@ An official Docker image is available. Documentation is [here](./docker/README.m
 
 APT and YUM repositories are [available](./docs/repo.md).
 
-SFTPGo is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=6e849ab8-70a6-47de-9a43-13c3fa849335) and [Azure Marketplace](https://azuremarketplace.microsoft.com/en-us/marketplace/apps/prasselsrl1645470739547.sftpgo_linux), purchasing from there will help keep SFTPGo a long-term sustainable project.
+SFTPGo is also available on some marketplaces:
+
+- [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=6e849ab8-70a6-47de-9a43-13c3fa849335)
+- [Azure Marketplace](https://azuremarketplace.microsoft.com/en-us/marketplace/apps/prasselsrl1645470739547.sftpgo_linux)
+- [Elest.io](https://elest.io/open-source/sftpgo)
+
+Purchasing from there will help keep SFTPGo a long-term sustainable project.
 
 <details><summary>Windows packages</summary>
 
@@ -206,16 +248,18 @@ The `revertprovider` command is not supported for the memory provider.
 
 Please note that we only support the current release branch and the current main branch, if you find a bug it is better to report it rather than downgrading to an older unsupported version.
 
-## Users and folders management
+## Users, groups and folders management
 
-After starting SFTPGo you can manage users and folders using:
+After starting SFTPGo you can manage users, groups, folders and other resources using:
 
 - the [web based administration interface](./docs/web-admin.md)
 - the [REST API](./docs/rest-api.md)
 
-To support embedded data providers like `bolt` and `SQLite` we can't have a CLI that directly write users and folders to the data provider, we always have to use the REST API.
+To support embedded data providers like `bolt` and `SQLite`, which do not support concurrent connections, we can't have a CLI that directly write users and other resources to the data provider, we always have to use the REST API.
 
-Full details for users, folders, admins and other resources are documented in the [OpenAPI](./openapi/openapi.yaml) schema. If you want to render the schema without importing it manually, you can explore it on [Stoplight](https://sftpgo.stoplight.io/docs/sftpgo/openapi.yaml).
+Full details for users, groups, folders, admins and other resources are documented in the [OpenAPI](./openapi/openapi.yaml) schema. If you want to render the schema without importing it manually, you can explore it on [Stoplight](https://sftpgo.stoplight.io/docs/sftpgo/openapi.yaml).
+
+:warning: SFTPGo users, groups and folders are virtual and therefore unrelated to the system ones. There is no need to create system-wide users and groups.
 
 ## Tutorials
 
@@ -313,14 +357,6 @@ SFTPGo makes use of the third party libraries listed inside [go.mod](./go.mod).
 We are very grateful to all the people who contributed with ideas and/or pull requests.
 
 Thank you [ysura](https://www.ysura.com/) for granting me stable access to a test AWS S3 account.
-
-## Sponsors
-
-I'd like to make SFTPGo into a sustainable long term project and your [sponsorship](https://github.com/sponsors/drakkan) will really help :heart:
-
-Thank you to our sponsors!
-
-[<img src="https://www.7digital.com/wp-content/themes/sevendigital/images/top_logo.png" alt="7digital logo">](https://www.7digital.com/)
 
 ## License
 

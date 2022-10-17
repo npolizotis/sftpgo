@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{template "base" .}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -25,6 +40,7 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Node</th>
                         <th>Username</th>
                         <th>Time</th>
                         <th>Info</th>
@@ -35,6 +51,7 @@
                     {{range .Connections}}
                     <tr>
                         <td>{{.ConnectionID}}</td>
+                        <td>{{.Node}}</td>
                         <td>{{.Username}}</td>
                         <td>{{.GetConnectionDuration}}</td>
                         <td>{{.GetConnectionInfo}}</td>
@@ -90,8 +107,10 @@
     function disconnectAction() {
         var table = $('#dataTable').DataTable();
         table.button('disconnect:name').enable(false);
-        var connectionID = table.row({ selected: true }).data()[0];
-        var path = '{{.ConnectionsURL}}' + "/" + connectionID;
+        var selectedData = table.row({ selected: true }).data()
+        var connectionID = selectedData[0];
+        var nodeID = selectedData[1];
+        var path = '{{.ConnectionsURL}}' + "/" + fixedEncodeURIComponent(connectionID)+"?node="+encodeURIComponent(nodeID);
         $('#disconnectModal').modal('hide');
         $.ajax({
             url: path,
@@ -159,13 +178,13 @@
             "lengthChange": true,
             "columnDefs": [
                 {
-                    "targets": [0],
+                    "targets": [0, 1],
                     "visible": false,
                     "searchable": false,
                     "className": "noVis"
                 },
                 {
-                    "targets": [1],
+                    "targets": [2],
                     "className": "noVis"
                 }
             ],
@@ -175,7 +194,7 @@
             "language": {
                 "emptyTable": "No user connected"
             },
-            "order": [[1, 'asc']]
+            "order": [[2, 'asc']]
         });
 
         new $.fn.dataTable.FixedHeader( table );

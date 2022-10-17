@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{template "base" .}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -49,7 +64,7 @@
                     <b>Virtual folders</b>
                 </div>
                 <div class="card-body">
-                    <h6 class="card-title mb-4">Quota -1 means included within user quota, 0 unlimited. Don't set -1 for shared folders</h6>
+                    <h6 class="card-title mb-4">Quota size -1 means included within user quota, 0 unlimited. Don't set -1 for shared folders. You can use MB/GB/TB suffix. With no suffix we assume bytes</h6>
                     <div class="form-group row">
                         <div class="col-md-12 form_field_vfolders_outer">
                             {{range $idx, $val := .Group.VirtualFolders}}
@@ -66,10 +81,10 @@
                                     </select>
                                 </div>
                                 <div class="form-group col-md-3">
-                                    <input type="number" class="form-control" id="idVfolderQuotaSize{{$idx}}" name="vfolder_quota_size"
-                                        value="{{$val.QuotaSize}}" min="-1" aria-describedby="vqsHelpBlock{{$idx}}">
+                                    <input type="text" class="form-control" id="idVfolderQuotaSize{{$idx}}" name="vfolder_quota_size"
+                                        value="{{HumanizeBytes $val.QuotaSize}}" aria-describedby="vqsHelpBlock{{$idx}}">
                                     <small id="vqsHelpBlock{{$idx}}" class="form-text text-muted">
-                                        Quota size (bytes)
+                                        Quota size
                                     </small>
                                 </div>
                                 <div class="form-group col-md-2">
@@ -99,10 +114,10 @@
                                     </select>
                                 </div>
                                 <div class="form-group col-md-3">
-                                    <input type="number" class="form-control" id="idVfolderQuotaSize0" name="vfolder_quota_size"
-                                        value="" min="-1" aria-describedby="vqsHelpBlock0">
+                                    <input type="text" class="form-control" id="idVfolderQuotaSize0" name="vfolder_quota_size"
+                                        value="" aria-describedby="vqsHelpBlock0">
                                     <small id="vqsHelpBlock0" class="form-text text-muted">
-                                        Quota size (bytes)
+                                        Quota size
                                     </small>
                                 </div>
                                 <div class="form-group col-md-2">
@@ -367,16 +382,16 @@
                             </button>
                         </h2>
                     </div>
-                    <div id="collapseQuota" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionUser">
+                    <div id="collapseQuota" class="collapse" aria-labelledby="headingQuota" data-parent="#accordionUser">
                         <div class="card-body">
 
                             <div class="form-group row">
-                                <label for="idQuotaSize" class="col-sm-2 col-form-label">Quota size (bytes)</label>
+                                <label for="idQuotaSize" class="col-sm-2 col-form-label">Quota size</label>
                                 <div class="col-sm-3">
-                                    <input type="number" class="form-control" id="idQuotaSize" name="quota_size" placeholder=""
-                                        value="{{.Group.UserSettings.QuotaSize}}" min="0" aria-describedby="qsHelpBlock">
+                                    <input type="text" class="form-control" id="idQuotaSize" name="quota_size" placeholder=""
+                                        value="{{HumanizeBytes .Group.UserSettings.QuotaSize}}" aria-describedby="qsHelpBlock">
                                     <small id="qsHelpBlock" class="form-text text-muted">
-                                        0 means no limit
+                                        0 means no limit. You can use MB/GB/TB suffix
                                     </small>
                                 </div>
                                 <div class="col-sm-2"></div>
@@ -391,13 +406,13 @@
                             </div>
 
                             <div class="form-group row">
-                                <label for="idMaxUploadSize" class="col-sm-2 col-form-label">Max file upload size (bytes)</label>
+                                <label for="idMaxUploadSize" class="col-sm-2 col-form-label">Max file upload size</label>
                                 <div class="col-sm-10">
-                                    <input type="number" class="form-control" id="idMaxUploadSize" name="max_upload_file_size"
-                                        placeholder="" value="{{.Group.UserSettings.Filters.MaxUploadFileSize}}" min="0"
+                                    <input type="text" class="form-control" id="idMaxUploadSize" name="max_upload_file_size"
+                                        placeholder="" value="{{HumanizeBytes .Group.UserSettings.Filters.MaxUploadFileSize}}"
                                         aria-describedby="fqsHelpBlock">
                                     <small id="fqsHelpBlock" class="form-text text-muted">
-                                        Maximum upload size for a single file. 0 means no limit
+                                        Maximum upload size for a single file. 0 means no limit. You can use MB/GB/TB suffix
                                     </small>
                                 </div>
                             </div>
@@ -648,7 +663,7 @@
                             </button>
                         </h2>
                     </div>
-                    <div id="collapseAdvanced" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionUser">
+                    <div id="collapseAdvanced" class="collapse" aria-labelledby="headingAdvanced" data-parent="#accordionUser">
                         <div class="card-body">
 
                             <div class="form-group row">
@@ -676,6 +691,30 @@
                             </div>
 
                             <div class="form-group row">
+                                <label for="idFTPSecurity" class="col-sm-2 col-form-label">FTP security</label>
+                                <div class="col-sm-10">
+                                    <select class="form-control selectpicker" id="idFTPSecurity" name="ftp_security" aria-describedby="ftpSecurityHelpBlock">
+                                        <option value="" {{if eq .Group.UserSettings.Filters.FTPSecurity 0 }}selected{{end}}>Server settings</option>
+                                        <option value="1" {{if eq .Group.UserSettings.Filters.FTPSecurity 1 }}selected{{end}}>Mandatory encryption</option>
+                                    </select>
+                                    <small id="ftpSecurityHelpBlock" class="form-text text-muted">
+                                        Ignored if TLS is globally required for all FTP users
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label for="idDefaultSharesExpiration" class="col-sm-2 col-form-label">Default shares expiration</label>
+                                <div class="col-sm-10">
+                                    <input type="number" class="form-control" id="idDefaultSharesExpiration" name="default_shares_expiration"
+                                        value="{{.Group.UserSettings.Filters.DefaultSharesExpiration}}" min="0" aria-describedby="defaultSharesExpirationHelpBlock">
+                                    <small id="defaultSharesExpirationHelpBlock" class="form-text text-muted">
+                                        Default expiration for newly created shares as number of days
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
                                 <label for="idHooks" class="col-sm-2 col-form-label">Hooks</label>
                                 <div class="col-sm-10">
                                     <select class="form-control selectpicker" id="idHooks" name="hooks" multiple>
@@ -689,6 +728,17 @@
                                             Check password disabled
                                         </option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="idAnonymous" name="is_anonymous"
+                                    {{if .Group.UserSettings.Filters.IsAnonymous}}checked{{end}} aria-describedby="anonymousHelpBlock">
+                                    <label for="idAnonymous" class="form-check-label">Is Anonymous</label>
+                                    <small id="anonymousHelpBlock" class="form-text text-muted">
+                                        Anonymous users are supported for FTP and WebDAV protocols and have read-only access
+                                    </small>
                                 </div>
                             </div>
 

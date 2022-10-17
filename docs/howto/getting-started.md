@@ -7,19 +7,22 @@ Virtual folders can be private or shared among multiple users, for shared virtua
 
 In this tutorial we explore the main features and concepts using the built-in web admin interface. Advanced users can also use the SFTPGo [REST API](https://sftpgo.stoplight.io/docs/sftpgo/openapi.yaml)
 
-- [Installation](#Installation)
-- [Initial configuration](#Initial-configuration)
-- [Creating users](#Creating-users)
-  - [Creating users with a Cloud Storage backend](#Creating-users-with-a-Cloud-Storage-backend)
-  - [Creating users with a local encrypted backend (Data At Rest Encryption)](#Creating-users-with-a-local-encrypted-backend-Data-At-Rest-Encryption))
-- [Virtual permissions](#Virtual-permissions)
-- [Virtual folders](#Virtual-folders)
-- [Configuration parameters](#Configuration-parameters)
-  - [Use PostgreSQL data provider](#Use-PostgreSQL-data-provider)
-  - [Use MySQL/MariaDB data provider](#Use-MySQLMariaDB-data-provider)
-  - [Use CockroachDB data provider](#Use-CockroachDB-data-provider)
-  - [Enable FTP service](#Enable-FTP-service)
-  - [Enable WebDAV service](#Enable-WebDAV-service)
+- [Installation](#installation)
+- [Initial configuration](#initial-configuration)
+- [Creating users](#creating-users)
+  - [Creating users with a Cloud Storage backend](#creating-users-with-a-cloud-storage-backend)
+  - [Creating users with a local encrypted backend (Data At Rest Encryption)](#creating-users-with-a-local-encrypted-backend-data-at-rest-Encryption)
+- [Virtual permissions](#virtual-permissions)
+- [Virtual folders](#virtual-folders)
+- [Groups](#groups)
+  - [Usage example](#usage-example)
+  - [Simplify user page](#simplify-user-page)
+- [Configuration parameters](#configuration-parameters)
+  - [Use PostgreSQL data provider](#use-postgresql-data-provider)
+  - [Use MySQL/MariaDB data provider](#use-mysqlmariadb-data-provider)
+  - [Use CockroachDB data provider](#use-cockroachdb-data-provider)
+  - [Enable FTP service](#enable-ftp-service)
+  - [Enable WebDAV service](#enable-webdav-service)
 
 ## Installation
 
@@ -59,6 +62,13 @@ Let's create our first local user:
 - click `Submit`
 
 ![Add user](./img/add-user.png)
+
+:warning: Please note that, on Linux, SFTPGo runs using a dedicated system user and group called `sftpgo`, for added security. If you want to be able to use directories outside the `/srv/sftpgo` path you need to set the appropriate system level permissions. For example if you define `/home/username/test` as home dir you have to create this directory yourself, if it doesn't exist, and set the appropriate system-level permissions:
+
+```shell
+sudo mkdir /home/username/test
+sudo chown sftpgo:sftpgo /home/username/test
+```
 
 Now test the new user, we use the `sftp` CLI here, you can use any SFTP client.
 
@@ -172,6 +182,9 @@ as you can see it worked as expected.
 
 ## Virtual folders
 
+A virtual folder is a mapping between a SFTPGo virtual path and a filesystem path outside the user home directory or on a different storage provider.
+Therefore, there is no need to create virtual folders for the users home directory or for directories within the users home directory.
+
 From the web admin interface click `Folders` and then the `+` icon.
 
 ![Add folder](./img/add-folder.png)
@@ -227,6 +240,87 @@ sftp> quit
 
 The last upload failed since we exceeded the number of files quota limit.
 
+## Groups
+
+Using groups simplifies the administration of multiple SFTPGo users: you can assign settings once to a group, instead of multiple times to each individual user.
+
+SFTPGo supports the following types of groups:
+
+- primary groups
+- secondary groups
+- membership groups
+
+A user can be a member of a primary group and many secondary and membership groups. Depending on the group type, the settings are inherited differently, more details [here](../groups.md).
+
+:warning: SFTPGo groups are completely unrelated to system groups. Therefore, it is not necessary to add Linux/Windows groups to use SFTPGo groups.
+
+### Usage example
+
+Suppose you have the following requirements:
+
+- each user must be restricted to a local home directory containing the username as last element of the path, for example `/srv/sftpgo/data/<username>`
+- for each user, the maximum upload size for a single file must be limited to 1GB
+- each user must have an S3 virtual folder available in the path `/s3<username>` and each user can only access a specified "prefix" of the S3 bucket. It must not be able to access other users' files
+- each user must have an S3 virtual folder available in the path `/shared`. This is a folder shared with other users
+- a group of users can only download and list contents in the `/shared` path while another group of users have full access
+
+We can easily meet these requirements by defining two groups.
+
+From the SFTPGo WebAdmin UI, click on `Folders` and then on the `+` icon.
+
+Create a folder named `S3private`.
+Set the storage to `AWS S3 (Compatible)` and fill the required parameters:
+
+- bucket name
+- region
+- credentials: access key and access secret
+
+![S3Private folder](./img/s3-private-folder.png)
+
+The important part is the `Key Prefix`, set it to `users/%username%/`
+
+![S3Private Key Prefix](./img/s3-key-prefix.png)
+
+The placeholder `%username%` will be replaced with the associated username.
+
+Create another folder named `S3shared` with the same settings as `S3private` but this time set the `Key Prefix` to `shared/`.
+The `Key Prefix` has no placeholder, so the folder will operate on a static path that won't change based on the associated user.
+
+Now click on `Groups` and then on the `+` icon and add a group named `Primary`.
+
+Set the `Home Dir` to `/srv/sftpgo/data/%username%`.
+
+![Add group](./img/add-group.png)
+
+As before, the placeholder `%username%` will be replaced with the associated username.
+
+Add the two virtual folders to this group and set the `Max file upload size` to 1GB.
+
+![Primary group settings](./img/primary-group-settings.png)
+
+Add a new group and name it `SharedReadOnly`, in the ACLs section set the permission on the `/shared` path so that read only access is granted.
+
+![Read-only share](./img/read-only-share.png)
+
+The group setup is now complete. We can now create our users and set the primary group to `Primary`.
+For the users who need read-only access to the `/shared` path we also have to set `SharedReadOnly` as a secondary group.
+
+You can now login with any SFTP client like FileZilla, WinSCP etc. and verify that the requirements are met.
+
+### Simplify user page
+
+The add/update user page has many configuration options and can be intimidating for some administrators. We can hide most of the settings and automatically add groups to newly created users. This way the hidden settings are inherited from the automatically assigned groups and therefore administrators can add new users simply by setting the username and credentials.
+
+Click on `Admins` and then on the `+` icon and add an admin named `simply`.
+In the `Groups for users` section set `Primary` as primary group and `SharedReadOnly` as `seconday` group.
+In the `User page preferences` section hide all the sections.
+
+![Simplified admin](./img/simplified-admin.png)
+
+Log in using the newly created administrator and try to add a new user. The user page is simplified as you can see in the following screen.
+
+![Simplified user add](./img/add-user-simplified.png)
+
 ## Configuration parameters
 
 Until now we used the default configuration, to change the global service parameters you have to edit the configuration file, or set appropriate environment variables, and restart SFTPGo to apply the changes.
@@ -234,6 +328,11 @@ Until now we used the default configuration, to change the global service parame
 A full explanation of all configuration methods can be found [here](./../full-configuration.md), we explore some common use cases. Please keep in mind that SFTPGo can also be configured via environment variables, this is very convenient if you are using Docker.
 
 The default configuration file is `sftpgo.json` and it can be found within the `/etc/sftpgo` directory if you installed from Linux distro packages. On Windows the configuration file can be found within the `{commonappdata}\SFTPGo` directory where `{commonappdata}` is typically `C:\ProgramData`. SFTPGo also supports reading from TOML and YAML configuration files.
+
+The configuration file can change between different versions and merging your custom settings with the default configuration file, after updating SFTPGo, may be time-consuming. For this reason we suggest to set your custom settings using environment variables.
+If you install SFTPGo on Linux using the official deb/rpm packages you can set your custom environment variables in the file `/etc/sftpgo/sftpgo.env`.
+SFTPGo also reads files inside the `env.d` directory relative to config dir (`/etc/sftpgo/env.d` on Linux and `{commonappdata}\SFTPGo\env.d` on Windows) and then exports the valid variables into environment variables if they are not already set.
+Of course you can also set environment variables with the method provided by the operating system of your choice.
 
 The following snippets assume your are running SFTPGo on Linux but they can be easily adapted for other operating systems.
 
@@ -249,7 +348,7 @@ grant all privileges on database "sftpgo" to "sftpgo";
 \q
 ```
 
-Open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
+You can open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
 
 ```json
   "data_provider": {
@@ -263,12 +362,23 @@ Open the SFTPGo configuration file, search for the `data_provider` section and c
 }
 ```
 
+Alternatively (recommended), you can use environment variables by creating the file `/etc/sftpgo/env.d/postgresql.env` with the following content.
+
+```shell
+SFTPGO_DATA_PROVIDER__DRIVER=postgresql
+SFTPGO_DATA_PROVIDER__NAME=sftpgo
+SFTPGO_DATA_PROVIDER__HOST=127.0.0.1
+SFTPGO_DATA_PROVIDER__PORT=5432
+SFTPGO_DATA_PROVIDER__USERNAME=sftpgo
+SFTPGO_DATA_PROVIDER__PASSWORD=your password here
+```
+
 Confirm that the database connection works by initializing the data provider.
 
 ```shell
 $ sudo su - sftpgo -s /bin/bash -c 'sftpgo initprovider -c /etc/sftpgo'
 2021-05-19T22:21:54.000 INF Initializing provider: "postgresql" config file: "/etc/sftpgo/sftpgo.json"
-2021-05-19T22:21:54.000 INF updating database version: 8 -> 9
+2021-05-19T22:21:54.000 INF updating database schema version: 8 -> 9
 2021-05-19T22:21:54.000 INF Data provider successfully initialized/updated
 ```
 
@@ -303,7 +413,7 @@ MariaDB [(none)]> quit
 Bye
 ```
 
-Open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
+You can open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
 
 ```json
   "data_provider": {
@@ -317,12 +427,23 @@ Open the SFTPGo configuration file, search for the `data_provider` section and c
 }
 ```
 
+Alternatively (recommended), you can use environment variables by creating the file `/etc/sftpgo/env.d/mysql.env` with the following content.
+
+```shell
+SFTPGO_DATA_PROVIDER__DRIVER=mysql
+SFTPGO_DATA_PROVIDER__NAME=sftpgo
+SFTPGO_DATA_PROVIDER__HOST=127.0.0.1
+SFTPGO_DATA_PROVIDER__PORT=3306
+SFTPGO_DATA_PROVIDER__USERNAME=sftpgo
+SFTPGO_DATA_PROVIDER__PASSWORD=your password here
+```
+
 Confirm that the database connection works by initializing the data provider.
 
 ```shell
 $ sudo su - sftpgo -s /bin/bash -c 'sftpgo initprovider -c /etc/sftpgo'
 2021-05-19T22:29:30.000 INF Initializing provider: "mysql" config file: "/etc/sftpgo/sftpgo.json"
-2021-05-19T22:29:30.000 INF updating database version: 8 -> 9
+2021-05-19T22:29:30.000 INF updating database schema version: 8 -> 9
 2021-05-19T22:29:30.000 INF Data provider successfully initialized/updated
 ```
 
@@ -347,7 +468,7 @@ We suppose you have installed CockroachDB this way:
 
 ```shell
 sudo su
-export CRDB_VERSION=22.1.0 # set the latest available version here
+export CRDB_VERSION=22.1.8 # set the latest available version here
 wget -qO- https://binaries.cockroachdb.com/cockroach-v${CRDB_VERSION}.linux-amd64.tgz | tar xvz
 cp -i cockroach-v${CRDB_VERSION}.linux-amd64/cockroach /usr/local/bin/
 mkdir -p /usr/local/lib/cockroach
@@ -377,9 +498,8 @@ ExecStart=/usr/local/bin/cockroach start-single-node --certs-dir=/etc/cockroach/
 TimeoutStopSec=60
 Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=cockroach
+StandardOutput=journal
+StandardError=journal
 User=sftpgo
 [Install]
 WantedBy=default.target
@@ -394,7 +514,7 @@ CREATE DATABASE
 Time: 13ms
 ```
 
-Open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
+You can open the SFTPGo configuration file, search for the `data_provider` section and change it as follow.
 
 ```json
   "data_provider": {
@@ -412,16 +532,30 @@ Open the SFTPGo configuration file, search for the `data_provider` section and c
 }
 ```
 
+Alternatively (recommended), you can use environment variables by creating the file `/etc/sftpgo/env.d/cockroachdb.env` with the following content.
+
+```shell
+SFTPGO_DATA_PROVIDER__DRIVER=cockroachdb
+SFTPGO_DATA_PROVIDER__NAME=sftpgo
+SFTPGO_DATA_PROVIDER__HOST=localhost
+SFTPGO_DATA_PROVIDER__PORT=26257
+SFTPGO_DATA_PROVIDER__USERNAME=root
+SFTPGO_DATA_PROVIDER__SSLMODE=3
+SFTPGO_DATA_PROVIDER__ROOT_CERT="/etc/cockroach/certs/ca.crt"
+SFTPGO_DATA_PROVIDER__CLIENT_CERT="/etc/cockroach/certs/client.root.crt"
+SFTPGO_DATA_PROVIDER__CLIENT_KEY="/etc/cockroach/certs/client.root.key"
+```
+
 Confirm that the database connection works by initializing the data provider.
 
 ```shell
 $ sudo su - sftpgo -s /bin/bash -c 'sftpgo initprovider -c /etc/sftpgo'
 2022-06-02T14:54:04.510 INF Initializing provider: "cockroachdb" config file: "/etc/sftpgo/sftpgo.json"
 2022-06-02T14:54:04.554 INF creating initial database schema, version 15
-2022-06-02T14:54:04.698 INF updating database version: 15 -> 16
-2022-06-02T14:54:07.093 INF updating database version: 16 -> 17
-2022-06-02T14:54:07.672 INF updating database version: 17 -> 18
-2022-06-02T14:54:07.699 INF updating database version: 18 -> 19
+2022-06-02T14:54:04.698 INF updating database schema version: 15 -> 16
+2022-06-02T14:54:07.093 INF updating database schema version: 16 -> 17
+2022-06-02T14:54:07.672 INF updating database schema version: 17 -> 18
+2022-06-02T14:54:07.699 INF updating database schema version: 18 -> 19
 2022-06-02T14:54:07.721 INF Data provider successfully initialized/updated
 ```
 
@@ -442,7 +576,7 @@ Restart SFTPGo to apply the changes.
 
 ### Enable FTP service
 
-Open the SFTPGo configuration file, search for the `ftpd` section and change it as follow.
+You can set the configuration options to enable the FTP service by opening the SFTPGo configuration file, looking for the `ftpd` section and editing it as follows.
 
 ```json
   "ftpd": {
@@ -475,6 +609,12 @@ Open the SFTPGo configuration file, search for the `ftpd` section and change it 
   }
 ```
 
+Alternatively (recommended), you can use environment variables by creating the file `/etc/sftpgo/env.d/ftpd.env` with the following content.
+
+```shell
+SFTPGO_FTPD__BINDINGS__0__PORT=2121
+```
+
 Restart SFTPGo to apply the changes. The FTP service is now available on port `2121`.
 
 You can also configure the passive ports range (`50000-50100` by default), these ports must be reachable for passive FTP to work. If your FTP server is on the private network side of a NAT configuration you have to set `force_passive_ip` to your external IP address. You may also need to open the passive port range on your firewall.
@@ -483,7 +623,7 @@ It is recommended that you provide a certificate and key file to expose FTP over
 
 ### Enable WebDAV service
 
-Open the SFTPGo configuration file, search for the `webdavd` section and change it as follow.
+You can set the configuration options to enable the FTP service by opening the SFTPGo configuration file, looking for the `webdavd` section and editing it as follows.
 
 ```json
   "webdavd": {
@@ -500,11 +640,18 @@ Open the SFTPGo configuration file, search for the `webdavd` section and change 
         "prefix": "",
         "proxy_allowed": [],
         "client_ip_proxy_header": "",
-        "client_ip_header_depth": 0
+        "client_ip_header_depth": 0,
+        "disable_www_auth_header": false
       }
     ],
     ...
   }
+```
+
+Alternatively (recommended), you can use environment variables by creating the file `/etc/sftpgo/env.d/webdavd.env` with the following content.
+
+```shell
+SFTPGO_WEBDAVD__BINDINGS__0__PORT=10080
 ```
 
 Restart SFTPGo to apply the changes. The WebDAV service is now available on port `10080`. It is recommended that you provide a certificate and key file to expose WebDAV over https.

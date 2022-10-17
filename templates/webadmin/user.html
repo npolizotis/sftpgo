@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{template "base" .}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -141,12 +156,13 @@
             </div>
             {{end}}
 
-            <div class="card bg-light mb-3">
+            {{if .Groups}}
+            <div class="card bg-light mb-3 {{if .LoggedAdmin.Filters.Preferences.HideGroups}}d-none{{end}}">
                 <div class="card-header">
                     <b>Groups</b>
                 </div>
                 <div class="card-body">
-                    <h6 class="card-title mb-4">Group membership impart the group settings if no override exist</h6>
+                    <h6 class="card-title mb-4">Group membership impart the group settings (with the exception of membership only groups) if no override exists</h6>
                     <div class="form-group row">
                         <label for="idPrimaryGroup" class="col-sm-2 col-form-label">Primary group</label>
                         <div class="col-sm-10">
@@ -168,17 +184,28 @@
                             </select>
                         </div>
                     </div>
+                    <div class="form-group row">
+                        <label for="idMembershipGroup" class="col-sm-2 col-form-label">Membership groups</label>
+                        <div class="col-sm-10">
+                            <select class="form-control selectpicker" data-live-search="true" id="idMembershipGroup" name="membership_groups" multiple>
+                                {{- range .Groups}}
+                                <option value="{{.Name}}" {{if $.User.HasMembershipGroup .Name}}selected{{end}}>{{.Name}}</option>
+                                {{- end}}
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
+            {{end}}
 
             {{template "fshtml" .FsWrapper}}
             {{if .VirtualFolders}}
-            <div class="card bg-light mb-3">
+            <div class="card bg-light mb-3 {{if .LoggedAdmin.Filters.Preferences.HideVirtualFolders}}d-none{{end}}">
                 <div class="card-header">
                     <b>Virtual folders</b>
                 </div>
                 <div class="card-body">
-                    <h6 class="card-title mb-4">Quota -1 means included within user quota, 0 unlimited. Don't set -1 for shared folders</h6>
+                    <h6 class="card-title mb-4">Quota size -1 means included within user quota, 0 unlimited. Don't set -1 for shared folders. You can use MB/GB/TB suffix. With no suffix we assume bytes</h6>
                     <div class="form-group row">
                         <div class="col-md-12 form_field_vfolders_outer">
                             {{range $idx, $val := .User.VirtualFolders}}
@@ -195,10 +222,10 @@
                                     </select>
                                 </div>
                                 <div class="form-group col-md-3">
-                                    <input type="number" class="form-control" id="idVfolderQuotaSize{{$idx}}" name="vfolder_quota_size"
-                                        value="{{$val.QuotaSize}}" min="-1" aria-describedby="vqsHelpBlock{{$idx}}">
+                                    <input type="text" class="form-control" id="idVfolderQuotaSize{{$idx}}" name="vfolder_quota_size"
+                                        value="{{HumanizeBytes $val.QuotaSize}}" aria-describedby="vqsHelpBlock{{$idx}}">
                                     <small id="vqsHelpBlock{{$idx}}" class="form-text text-muted">
-                                        Quota size (bytes)
+                                        Quota size
                                     </small>
                                 </div>
                                 <div class="form-group col-md-2">
@@ -228,10 +255,10 @@
                                     </select>
                                 </div>
                                 <div class="form-group col-md-3">
-                                    <input type="number" class="form-control" id="idVfolderQuotaSize0" name="vfolder_quota_size"
-                                        value="" min="-1" aria-describedby="vqsHelpBlock0">
+                                    <input type="text" class="form-control" id="idVfolderQuotaSize0" name="vfolder_quota_size"
+                                        value="" aria-describedby="vqsHelpBlock0">
                                     <small id="vqsHelpBlock0" class="form-text text-muted">
-                                        Quota size (bytes)
+                                        Quota size
                                     </small>
                                 </div>
                                 <div class="form-group col-md-2">
@@ -260,8 +287,8 @@
             </div>
             {{end}}
 
-            <div class="accordion" id="accordionUser">
-                <div class="card">
+            <div class="accordion {{if eq .LoggedAdmin.Filters.Preferences.VisibleUserPageSections 0}}d-none{{end}}" id="accordionUser">
+                <div class="card {{if .LoggedAdmin.Filters.Preferences.HideProfile}}d-none{{end}}">
                     <div class="card-header" id="headingProfile">
                         <h2 class="mb-0">
                             <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
@@ -302,17 +329,6 @@
                                 </div>
                             </div>
 
-                            <div class="form-group">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="idAllowAPIKeyAuth" name="allow_api_key_auth"
-                                    {{if .User.Filters.AllowAPIKeyAuth}}checked{{end}} aria-describedby="allowAPIKeyAuthHelpBlock">
-                                    <label for="idAllowAPIKeyAuth" class="form-check-label">Allow API key authentication</label>
-                                    <small id="allowAPIKeyAuthHelpBlock" class="form-text text-muted">
-                                        Allow to impersonate this user, in REST API, with an API key
-                                    </small>
-                                </div>
-                            </div>
-
                             <div class="form-group row">
                                 <label for="idDescription" class="col-sm-2 col-form-label">Description</label>
                                 <div class="col-sm-10">
@@ -338,7 +354,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card {{if .LoggedAdmin.Filters.Preferences.HideACLs}}d-none{{end}}">
                     <div class="card-header" id="headingPermissions">
                         <h2 class="mb-0">
                             <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
@@ -576,7 +592,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card {{if .LoggedAdmin.Filters.Preferences.HideDiskQuotaAndBandwidthLimits}}d-none{{end}}">
                     <div class="card-header" id="headingQuota">
                         <h2 class="mb-0">
                             <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse"
@@ -585,16 +601,16 @@
                             </button>
                         </h2>
                     </div>
-                    <div id="collapseQuota" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionUser">
+                    <div id="collapseQuota" class="collapse" aria-labelledby="headingQuota" data-parent="#accordionUser">
                         <div class="card-body">
 
                             <div class="form-group row">
-                                <label for="idQuotaSize" class="col-sm-2 col-form-label">Quota size (bytes)</label>
+                                <label for="idQuotaSize" class="col-sm-2 col-form-label">Quota size</label>
                                 <div class="col-sm-3">
-                                    <input type="number" class="form-control" id="idQuotaSize" name="quota_size" placeholder=""
-                                        value="{{.User.QuotaSize}}" min="0" aria-describedby="qsHelpBlock">
+                                    <input type="text" class="form-control" id="idQuotaSize" name="quota_size" placeholder=""
+                                        value="{{HumanizeBytes .User.QuotaSize}}" aria-describedby="qsHelpBlock">
                                     <small id="qsHelpBlock" class="form-text text-muted">
-                                        0 means no limit
+                                        0 means no limit. You can use MB/GB/TB suffix
                                     </small>
                                 </div>
                                 <div class="col-sm-2"></div>
@@ -609,13 +625,13 @@
                             </div>
 
                             <div class="form-group row">
-                                <label for="idMaxUploadSize" class="col-sm-2 col-form-label">Max file upload size (bytes)</label>
+                                <label for="idMaxUploadSize" class="col-sm-2 col-form-label">Max file upload size</label>
                                 <div class="col-sm-10">
-                                    <input type="number" class="form-control" id="idMaxUploadSize" name="max_upload_file_size"
-                                        placeholder="" value="{{.User.Filters.MaxUploadFileSize}}" min="0"
+                                    <input type="text" class="form-control" id="idMaxUploadSize" name="max_upload_file_size"
+                                        placeholder="" value="{{HumanizeBytes .User.Filters.MaxUploadFileSize}}"
                                         aria-describedby="fqsHelpBlock">
                                     <small id="fqsHelpBlock" class="form-text text-muted">
-                                        Maximum upload size for a single file. 0 means no limit
+                                        Maximum upload size for a single file. 0 means no limit. You can use MB/GB/TB suffix
                                     </small>
                                 </div>
                             </div>
@@ -857,7 +873,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card {{if .LoggedAdmin.Filters.Preferences.HideAdvancedSettings}}d-none{{end}}">
                     <div class="card-header" id="headingAdvanced">
                         <h2 class="mb-0">
                             <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse"
@@ -866,7 +882,7 @@
                             </button>
                         </h2>
                     </div>
-                    <div id="collapseAdvanced" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionUser">
+                    <div id="collapseAdvanced" class="collapse" aria-labelledby="headingAdvanced" data-parent="#accordionUser">
                         <div class="card-body">
 
                             <div class="form-group row">
@@ -889,6 +905,30 @@
                                     </select>
                                     <small id="tlsUsernameHelpBlock" class="form-text text-muted">
                                         Defines the TLS certificate field to use as username. Ignored if mutual TLS is disabled
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label for="idFTPSecurity" class="col-sm-2 col-form-label">FTP security</label>
+                                <div class="col-sm-10">
+                                    <select class="form-control selectpicker" id="idFTPSecurity" name="ftp_security" aria-describedby="ftpSecurityHelpBlock">
+                                        <option value="" {{if eq .User.Filters.FTPSecurity 0 }}selected{{end}}>Server settings</option>
+                                        <option value="1" {{if eq .User.Filters.FTPSecurity 1 }}selected{{end}}>Mandatory encryption</option>
+                                    </select>
+                                    <small id="ftpSecurityHelpBlock" class="form-text text-muted">
+                                        Ignored if TLS is globally required for all FTP users
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label for="idDefaultSharesExpiration" class="col-sm-2 col-form-label">Default shares expiration</label>
+                                <div class="col-sm-10">
+                                    <input type="number" class="form-control" id="idDefaultSharesExpiration" name="default_shares_expiration"
+                                        value="{{.User.Filters.DefaultSharesExpiration}}" min="0" aria-describedby="defaultSharesExpirationHelpBlock">
+                                    <small id="defaultSharesExpirationHelpBlock" class="form-text text-muted">
+                                        Default expiration for newly created shares as number of days
                                     </small>
                                 </div>
                             </div>
@@ -926,11 +966,33 @@
 
                             <div class="form-group">
                                 <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="idAnonymous" name="is_anonymous"
+                                    {{if .User.Filters.IsAnonymous}}checked{{end}} aria-describedby="anonymousHelpBlock">
+                                    <label for="idAnonymous" class="form-check-label">Is Anonymous</label>
+                                    <small id="anonymousHelpBlock" class="form-text text-muted">
+                                        Anonymous users are supported for FTP and WebDAV protocols and have read-only access
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="idDisableFsChecks" name="disable_fs_checks"
                                     {{if .User.Filters.DisableFsChecks}}checked{{end}} aria-describedby="disableFsChecksHelpBlock">
                                     <label for="idDisableFsChecks" class="form-check-label">Disable filesystem checks</label>
                                     <small id="disableFsChecksHelpBlock" class="form-text text-muted">
                                         Disable checks for existence and automatic creation of home directory and virtual folders
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="idAllowAPIKeyAuth" name="allow_api_key_auth"
+                                    {{if .User.Filters.AllowAPIKeyAuth}}checked{{end}} aria-describedby="allowAPIKeyAuthHelpBlock">
+                                    <label for="idAllowAPIKeyAuth" class="form-check-label">Allow API key authentication</label>
+                                    <small id="allowAPIKeyAuthHelpBlock" class="form-text text-muted">
+                                        Allow to impersonate this user, in REST API, with an API key
                                     </small>
                                 </div>
                             </div>
@@ -984,9 +1046,10 @@
 <script src="{{.StaticURL}}/vendor/bootstrap-select/js/bootstrap-select.min.js"></script>
 <script type="text/javascript">
     $(document).ready(function () {
-        $.fn.selectpicker.Constructor.BootstrapVersion = '4';
         {{if .Error}}
+        {{if ne .LoggedAdmin.Filters.Preferences.VisibleUserPageSections 0}}
         $('#accordionUser .collapse').removeAttr("data-parent").collapse('show');
+        {{end}}
         {{end}}
         $('#expirationDatePicker').datetimepicker({
             format: 'YYYY-MM-DD',

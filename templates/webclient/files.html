@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{template "base" .}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -9,6 +24,7 @@
 <link href="{{.StaticURL}}/vendor/datatables/responsive.bootstrap4.min.css" rel="stylesheet">
 <link href="{{.StaticURL}}/vendor/datatables/dataTables.checkboxes.css" rel="stylesheet">
 <link href="{{.StaticURL}}/vendor/lightbox2/css/lightbox.min.css" rel="stylesheet">
+<link href="{{.StaticURL}}/vendor/video-js/video-js.min.css" rel="stylesheet" />
 <style>
     div.dataTables_wrapper span.selected-info,
     div.dataTables_wrapper span.selected-item {
@@ -170,6 +186,27 @@
     </div>
 </div>
 
+<div class="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="videoModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoModalLabel">
+                    <span id="video_title"></span>
+                </h5>
+                <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <video id="video_player" class="video-js vjs-big-play-centered vjs-fluid">
+                    <p class="vjs-no-js">To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+                  </video>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="spinnerModal" tabindex="-1" role="dialog" data-keyboard="false" data-backdrop="static">
     <div class="modal-dialog modal-dialog-centered justify-content-center" role="document">
         <span style="color: #333333;" class="fa fa-spinner fa-spin fa-3x"></span>
@@ -191,6 +228,7 @@
 <script src="{{.StaticURL}}/vendor/pdfobject/pdfobject.min.js"></script>
 <script src="{{.StaticURL}}/vendor/codemirror/codemirror.js"></script>
 <script src="{{.StaticURL}}/vendor/codemirror/meta.js"></script>
+<script src="{{.StaticURL}}/vendor/video-js/video.min.js"></script>
 {{if .HasIntegrations}}
 <script type="text/javascript">
     var childReference = null;
@@ -201,7 +239,7 @@
         if (childReference == null || childReference.closed) {
             childProps.set('link', fileLink);
             childProps.set('url', url);
-            childProps.set('file_name', fileName);
+            childProps.set('file_name', UnicodeDecodeB64(fileName));
             childReference = window.open(url, '_blank');
             if (!checkerStarted){
                 keepAlive();
@@ -328,7 +366,7 @@
 
                 async function saveBlob() {
                     var errorMessage = "Error saving external file";
-                    var uploadPath = '{{.FileURL}}?path={{.CurrentDir}}'+encodeURIComponent("/"+childProps.get('file_name'));
+                    var uploadPath = '{{.FileURL}}?path={{.CurrentDir}}'+encodeURIComponent("/"+unescapeHTML(childProps.get('file_name')));
                     let response;
                     try {
                         response = await fetch(uploadPath, {
@@ -392,14 +430,8 @@
 {{end}}
 <script type="text/javascript">
     var spinnerDone = false;
-
-    var escapeHTML = function ( t ) {
-		return t
-			.replace( /&/g, '&amp;' )
-			.replace( /</g, '&lt;' )
-			.replace( />/g, '&gt;' )
-			.replace( /"/g, '&quot;' );
-	};
+    var player;
+    var playerKeepAlive;
 
     function shortenData(d, cutoff) {
         if ( typeof d !== 'string' ) {
@@ -407,11 +439,22 @@
 		}
 
 		if ( d.length <= cutoff ) {
-			return d;
+			return escapeHTML(d);
 		}
 
         var shortened = d.substr(0, cutoff-1);
-        return shortened+'&#8230;';
+        return escapeHTML(shortened)+'&#8230;';
+    }
+
+    function openVideoPlayer(name, url, videoType){
+        $("#video_title").text(UnicodeDecodeB64(name));
+        $('#videoModal').modal('show');
+        player.src({
+            type: videoType,
+            src: url
+        });
+        keepAlive();
+        playerKeepAlive = setInterval(keepAlive, 300000);
     }
 
     function getIconForFile(filename) {
@@ -445,6 +488,7 @@
             case "mpeg":
             case "mpv":
             case "3gp":
+            case "mp4":
                 return "far fa-file-video";
             case "jpeg":
             case "jpg":
@@ -607,6 +651,19 @@
     }
 
     $(document).ready(function () {
+        player = videojs('video_player', {
+            controls: true,
+            autoplay: false,
+            preload: 'auto'
+        });
+        $('#videoModal').on('hide.bs.modal', function () {
+            player.pause();
+            player.reset();
+            if (playerKeepAlive != null){
+                clearInterval(playerKeepAlive);
+            }
+        });
+
         $('#spinnerModal').on('shown.bs.modal', function () {
             if (spinnerDone){
                 $('#spinnerModal').modal('hide');
@@ -938,8 +995,9 @@
                             var title = "";
                             var cssClass = "";
                             var shortened = shortenData(data, 70);
+                            data = escapeHTML(data);
                             if (shortened != data){
-                                title = escapeHTML(data);
+                                title = data;
                                 cssClass = "ellipsis";
                             }
 
@@ -960,7 +1018,7 @@
                 { "data": "edit_url",
                     "render": function (data, type, row) {
                         if (type === 'display') {
-                            var filename = row["name"];
+                            var filename = escapeHTML(row["name"]);
                             var extension = filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
                             if (data){
                                 if (extension == "csv" || extension == "bat" || CodeMirror.findModeByExtension(extension) != null){
@@ -981,8 +1039,19 @@
                                     case "bmp":
                                     case "svg":
                                     case "ico":
-                                        var view_url = row['url']+"&inline=1";
-                                        return `<a href="${view_url}" data-lightbox="${filename}" data-title="${filename}"><i class="fas fa-eye"></i></a>`;
+                                        var title = escapeHTMLForceSafe(row["name"])
+                                        return `<a href="${row['url']}" data-lightbox="image-gallery" data-title="${title}"><i class="fas fa-eye"></i></a>`;
+                                    case "mp4":
+                                    case "mov":
+                                        var name = b64EncodeUnicode(row["name"]);
+                                        return `<a href="#" onclick="openVideoPlayer('${name}', '${row['url']}', 'video/mp4');"><i class="fas fa-eye"></i></a>`;
+                                    case "webm":
+                                        var name = b64EncodeUnicode(row["name"]);
+                                        return `<a href="#" onclick="openVideoPlayer('${name}', '${row['url']}', 'video/webm');"><i class="fas fa-eye"></i></a>`;
+                                    case "ogv":
+                                    case "ogg":
+                                        var name = b64EncodeUnicode(row["name"]);
+                                        return `<a href="#" onclick="openVideoPlayer('${name}}', '${row['url']}', 'video/ogg');"><i class="fas fa-eye"></i></a>`;
                                     case "pdf":
                                         if (PDFObject.supportsPDFs){
                                             var view_url = row['url'];
@@ -1000,7 +1069,8 @@
                         {{if .HasIntegrations}}
                         if (type === 'display') {
                             if (data){
-                                return `<a href="#" onclick="openExternalURL('${data}', '${row["ext_link"]}', '${row["name"]}');"><i class="fas fa-external-link-alt"></i></a>`;
+                                var name = b64EncodeUnicode(escapeHTML(row["name"]));
+                                return `<a href="#" onclick="openExternalURL('${data}', '${row["ext_link"]}', '${name}');"><i class="fas fa-external-link-alt"></i></a>`;
                             }
                         }
                         {{end}}

@@ -1,3 +1,18 @@
+<!--
+Copyright (C) 2019-2022  Nicola Murino
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
 {{define "base"}}
 <!DOCTYPE html>
 <html lang="en">
@@ -74,6 +89,22 @@
             </li>
             {{end}}
 
+            {{ if .LoggedAdmin.HasPermission "manage_event_rules"}}
+            <li class="nav-item {{if .IsEventManagerPage}}active{{end}}">
+                <a class="nav-link {{if not .IsEventManagerPage}}collapsed{{end}}" href="#" data-toggle="collapse" data-target="#collapseEventManager"
+                    aria-expanded="true" aria-controls="collapseEventManager">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Event Manager</span>
+                </a>
+                <div id="collapseEventManager" class="collapse {{if .IsEventManagerPage}}show{{end}}" aria-labelledby="headingEventManager" data-parent="#accordionSidebar">
+                    <div class="bg-white py-2 collapse-inner rounded">
+                        <a class="collapse-item {{if eq .CurrentURL .EventRulesURL}}active{{end}}" href="{{.EventRulesURL}}">{{.EventRulesTitle}}</a>
+                        <a class="collapse-item {{if eq .CurrentURL .EventActionsURL}}active{{end}}" href="{{.EventActionsURL}}">{{.EventActionsTitle}}</a>
+                    </div>
+                </div>
+            </li>
+            {{end}}
+
             {{ if .LoggedAdmin.HasPermission "view_conns"}}
             <li class="nav-item {{if eq .CurrentURL .ConnectionsURL}}active{{end}}">
                 <a class="nav-link" href="{{.ConnectionsURL}}">
@@ -142,6 +173,7 @@
 
                     <!-- Topbar Navbar -->
                     <ul class="navbar-nav ml-auto">
+                        {{block "additionalnavitems" .}}{{end}}
 
                         <!-- Nav Item - User Information -->
                         <li class="nav-item dropdown no-arrow">
@@ -250,8 +282,21 @@
     <script src="{{.StaticURL}}/js/sb-admin-2.min.js"></script>
 
     <script type="text/javascript">
+        function escapeHTML(str) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+
+        function unescapeHTML(escapedStr) {
+            var div = document.createElement('div');
+            div.innerHTML = escapedStr;
+            var child = div.childNodes[0];
+            return child ? child.nodeValue : '';
+        }
+
         function fixedEncodeURIComponent(str) {
-            return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
+            return encodeURIComponent(unescapeHTML(str)).replace(/[!'()*]/g, function (c) {
                 return '%' + c.charCodeAt(0).toString(16);
             });
         }

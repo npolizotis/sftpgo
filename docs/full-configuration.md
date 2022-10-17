@@ -40,7 +40,7 @@ The `serve` command supports the following flags:
 - `--log-max-age` int. Maximum number of days to retain old log files. Default 28 or the value of `SFTPGO_LOG_MAX_AGE` environment variable. It is unused if `log-file-path` is empty.
 - `--log-max-backups` int. Maximum number of old log files to retain. Default 5 or the value of `SFTPGO_LOG_MAX_BACKUPS` environment variable. It is unused if `log-file-path` is empty.
 - `--log-max-size` int. Maximum size in megabytes of the log file before it gets rotated. Default 10 or the value of `SFTPGO_LOG_MAX_SIZE` environment variable. It is unused if `log-file-path` is empty.
-- `--log-verbose` boolean. Enable verbose logs. Default `true` or the value of `SFTPGO_LOG_VERBOSE` environment variable (1 or `true`, 0 or `false`).
+- `--log-level` string. Set the log level. Supported values: `debug`, `info`, `warn`, `error`. Default `debug` or the value of `SFTPGO_LOG_LEVEL` environment variable.
 - `--log-utc-time` boolean. Enable UTC time for logging. Default `false` or the value of `SFTPGO_LOG_UTC_TIME` environment variable (1 or `true`, 0 or `false`)
 
 Log file can be rotated on demand sending a `SIGUSR1` signal on Unix based systems and using the command `sftpgo service rotatelogs` on Windows.
@@ -57,7 +57,7 @@ The configuration file contains the following sections:
 
 - **"common"**, configuration parameters shared among all the supported protocols
   - `idle_timeout`, integer. Time in minutes after which an idle client will be disconnected. 0 means disabled. Default: 15
-  - `upload_mode` integer. 0 means standard: the files are uploaded directly to the requested path. 1 means atomic: files are uploaded to a temporary path and renamed to the requested path when the client ends the upload. Atomic mode avoids problems such as a web server that serves partial files when the files are being uploaded. In atomic mode, if there is an upload error, the temporary file is deleted and so the requested upload path will not contain a partial file. 2 means atomic with resume support: same as atomic but if there is an upload error, the temporary file is renamed to the requested path and not deleted. This way, a client can reconnect and resume the upload. Default: 0
+  - `upload_mode` integer. 0 means standard: the files are uploaded directly to the requested path. 1 means atomic: files are uploaded to a temporary path and renamed to the requested path when the client ends the upload. Atomic mode avoids problems such as a web server that serves partial files when the files are being uploaded. In atomic mode, if there is an upload error, the temporary file is deleted and so the requested upload path will not contain a partial file. 2 means atomic with resume support: same as atomic but if there is an upload error, the temporary file is renamed to the requested path and not deleted. This way, a client can reconnect and resume the upload. Ignored for cloud-based storage backends (uploads are always atomic and resume is not supported for these backends) and for SFTP backend if buffering is enabled. Default: 0
   - `actions`, struct. It contains the command to execute and/or the HTTP URL to notify and the trigger conditions. See [Custom Actions](./custom-actions.md) for more details
     - `execute_on`, list of strings. Valid values are `pre-download`, `download`, `pre-upload`, `upload`, `pre-delete`, `delete`, `rename`, `mkdir`, `rmdir`, `ssh_cmd`. Leave empty to disable actions.
     - `execute_sync`, list of strings. Actions, defined in the `execute_on` list above, to be performed synchronously. The `pre-*` actions are always executed synchronously while the other ones are asynchronous. Executing an action synchronously means that SFTPGo will not return a result code to the client (which is waiting for it) until your hook have completed its execution. Leave empty to execute only the defined `pre-*` hook synchronously
@@ -78,6 +78,7 @@ The configuration file contains the following sections:
   - `max_total_connections`, integer. Maximum number of concurrent client connections. 0 means unlimited. Default: 0.
   - `max_per_host_connections`, integer.  Maximum number of concurrent client connections from the same host (IP). If the defender is enabled, exceeding this limit will generate `score_limit_exceeded` events and thus hosts that repeatedly exceed the max allowed connections can be automatically blocked. 0 means unlimited. Default: 20.
   - `whitelist_file`, string. Path to a file containing a list of IP addresses and/or networks to allow. Only the listed IPs/networks can access the configured services, all other client connections will be dropped before they even try to authenticate. The whitelist must be a JSON file with the same structure documented for the [defenders's list](./defender.md). The whitelist can be reloaded on demand sending a `SIGHUP` signal on Unix based systems and a `paramchange` request to the running service on Windows. Default: "".
+  - `allow_self_connections`, integer. Allow users on this instance to use other users/virtual folders on this instance as storage backend. Enable this setting if you know what you are doing. Set to `1` to enable. Default: `0`.
   - `defender`, struct containing the defender configuration. See [Defender](./defender.md) for more details.
     - `enabled`, boolean. Default `false`.
     - `driver`, string. Supported drivers are `memory` and `provider`. The `provider` driver will use the configured data provider to store defender events and it is supported for `MySQL`, `PostgreSQL` and `CockroachDB` data providers. Using the `provider` driver you can share the defender events among multiple SFTPGO instances. For a single instance the `memory` driver will be much faster. Default: `memory`.
@@ -182,6 +183,7 @@ The configuration file contains the following sections:
     - `proxy_allowed`, list of IP addresses and IP ranges allowed to set client IP proxy header such as `X-Forwarded-For`. Any client IP proxy headers, if set on requests from a connection address not in this list, will be silently ignored. Default: empty.
     - `client_ip_proxy_header`, string. Defines the allowed client IP proxy header such as `X-Forwarded-For`, `X-Real-IP` etc. Default: empty
     - `client_ip_header_depth`, integer. Some client IP headers such as `X-Forwarded-For` can contain multiple IP address, this setting define the position to trust starting from the right. For example if we have: `10.0.0.1,11.0.0.1,12.0.0.1,13.0.0.1` and the depth is `0`, SFTPGo will use `13.0.0.1` as client IP, if depth is `1`, `12.0.0.1` will be used and so on. Default: `0`.
+    - `disable_www_auth_header`, boolean. Set to `true` to not add the WWW-Authenticate header after an authentication failure, only the `401` status code will be sent. Default: `false`.
   - `certificate_file`, string. Certificate for WebDAV over HTTPS. This can be an absolute path or a path relative to the config dir.
   - `certificate_key_file`, string. Private key matching the above certificate. This can be an absolute path or a path relative to the config dir. A certificate and a private key are required to enable HTTPS connections. Certificate and key files can be reloaded on demand sending a `SIGHUP` signal on Unix based systems and a `paramchange` request to the running service on Windows.
   - `ca_certificates`, list of strings. Set of root certificate authorities to be used to verify client certificates.
@@ -194,6 +196,9 @@ The configuration file contains the following sections:
     - `exposed_headers`, list of strings.
     - `allow_credentials` boolean.
     - `max_age`, integer.
+    - `options_passthrough`, boolean.
+    - `options_success_status`, integer.
+    - `allow_private_network`, boolean.
   - `cache` struct containing cache configuration for the authenticated users.
     - `enabled`, boolean, set to true to enable user caching. Default: true.
     - `expiration_time`, integer. Expiration time, in minutes, for the cached users. 0 means unlimited. Default: 0.
@@ -201,12 +206,14 @@ The configuration file contains the following sections:
 - **"data_provider"**, the configuration for the data provider
   - `driver`, string. Supported drivers are `sqlite`, `mysql`, `postgresql`, `cockroachdb`, `bolt`, `memory`
   - `name`, string. Database name. For driver `sqlite` this can be the database name relative to the config dir or the absolute path to the SQLite database. For driver `memory` this is the (optional) path relative to the config dir or the absolute path to the provider dump, obtained using the `dumpdata` REST API, to load. This dump will be loaded at startup and can be reloaded on demand sending a `SIGHUP` signal on Unix based systems and a `paramchange` request to the running service on Windows. The `memory` provider will not modify the provided file so quota usage and last login will not be persisted. If you plan to use a SQLite database over a `cifs` network share (this is not recommended in general) you must use the `nobrl` mount option otherwise you will get the `database is locked` error. Some users reported that the `bolt` provider works fine over `cifs` shares.
-  - `host`, string. Database host. Leave empty for drivers `sqlite`, `bolt` and `memory`
+  - `host`, string. Database host. For `postgresql` and `cockroachdb` drivers you can specify multiple hosts separated by commas. Leave empty for drivers `sqlite`, `bolt` and `memory`
   - `port`, integer. Database port. Leave empty for drivers `sqlite`, `bolt` and `memory`
   - `username`, string. Database user. Leave empty for drivers `sqlite`, `bolt` and `memory`
   - `password`, string. Database password. Leave empty for drivers `sqlite`, `bolt` and `memory`
   - `sslmode`, integer. Used for drivers `mysql` and `postgresql`. 0 disable TLS connections, 1 require TLS, 2 set TLS mode to `verify-ca` for driver `postgresql` and `skip-verify` for driver `mysql`, 3 set TLS mode to `verify-full` for driver `postgresql` and `preferred` for driver `mysql`
   - `root_cert`, string. Path to the root certificate authority used to verify that the server certificate was signed by a trusted CA
+  - `disable_sni`, boolean. Allows to opt out Server Name Indication (SNI) for TLS connections. Default: `false`
+  - `target_session_attrs`, string. This is a `postgresql` and `cockroachdb` specific option. It determines whether the session must have certain properties to be acceptable. It's typically used in combination with multiple host names to select the first acceptable alternative among several hosts. Supported values: `any`, `read-write`, `read-only`, `primary`, `standby`, `prefer-standby`. If empty, `any` is assumed.
   - `client_cert`, string. Path to the client certificate for two-way TLS authentication
   - `client_key`,string. Path to the client key for two-way TLS authentication
   - `connection_string`, string. Provide a custom database connection string. If not empty, this connection string will be used instead of building one using the previous parameters. Leave empty for drivers `bolt` and `memory`
@@ -220,7 +227,7 @@ The configuration file contains the following sections:
   - `users_base_dir`, string. Users default base directory. If no home dir is defined while adding a new user, and this value is a valid absolute path, then the user home dir will be automatically defined as the path obtained joining the base dir and the username
   - `actions`, struct. It contains the command to execute and/or the HTTP URL to notify and the trigger conditions. See [Custom Actions](./custom-actions.md) for more details
     - `execute_on`, list of strings. Valid values are `add`, `update`, `delete`. `update` action will not be fired for internal updates such as the last login or the user quota fields.
-    - `execute_for`, list of strings. Defines the provider objects that trigger the action. Valid values are `user`, `admin`, `api_key`.
+    - `execute_for`, list of strings. Defines the provider objects that trigger the action. Valid values are `user`, `folder`, `group`, `admin`, `api_key`, `share`, `event_action`, `event_rule`.
     - `hook`, string. Absolute path to the command to execute or HTTP URL to notify.
   - `external_auth_hook`, string. Absolute path to an external program or an HTTP URL to invoke for users authentication. See [External Authentication](./external-auth.md) for more details. Leave empty to disable.
   - `external_auth_scope`, integer. 0 means all supported authentication scopes (passwords, public keys and keyboard interactive). 1 means passwords only. 2 means public keys only. 4 means key keyboard interactive only. 8 means TLS certificate. The flags can be combined, for example 6 means public keys and keyboard interactive
@@ -247,18 +254,20 @@ The configuration file contains the following sections:
   - `update_mode`, integer. Defines how the database will be initialized/updated. 0 means automatically. 1 means manually using the initprovider sub-command.
   - `create_default_admin`, boolean. Before you can use SFTPGo you need to create an admin account. If you open the admin web UI, a setup screen will guide you in creating the first admin account. You can automatically create the first admin account by enabling this setting and setting the environment variables `SFTPGO_DEFAULT_ADMIN_USERNAME` and `SFTPGO_DEFAULT_ADMIN_PASSWORD`. You can also create the first admin by loading initial data. This setting has no effect if an admin account is already found within the data provider. Default `false`.
   - `naming_rules`, integer. Naming rules for usernames, folder and group names. `0` means no rules. `1` means you can use any UTF-8 character. The names are used in URIs for REST API and Web admin. If not set only unreserved URI characters are allowed: ALPHA / DIGIT / "-" / "." / "_" / "~". `2` means names are converted to lowercase before saving/matching and so case insensitive matching is possible. `3` means trimming trailing and leading white spaces before saving/matching. Rules can be combined, for example `3` means both converting to lowercase and allowing any UTF-8 character. Enabling these options for existing installations could be backward incompatible, some users could be unable to login, for example existing users with mixed cases in their usernames. You have to ensure that all existing users respect the defined rules. Default: `1`.
-  - `is_shared`, integer. If the data provider is shared across multiple SFTPGo instances, set this parameter to `1`. `MySQL`, `PostgreSQL` and `CockroachDB` can be shared, this setting is ignored for other data providers. For shared data providers, active transfers are persisted in the database and thus quota checks between ongoing transfers will work cross multiple instances. Password reset requests and OIDC tokens/states are also persisted in the database if the provider is shared. The database table `shared_sessions` is used only to store temporary sessions. In performance critical installations, you might consider using a database-specific optimization, for example you might use an `UNLOGGED` table for PostgreSQL. This optimization in only required in very limited use cases. Default: `0`.
+  - `is_shared`, integer. If the data provider is shared across multiple SFTPGo instances, set this parameter to `1`. `MySQL`, `PostgreSQL` and `CockroachDB` can be shared, this setting is ignored for other data providers. For shared data providers, active transfers are persisted in the database and thus quota checks between ongoing transfers will work cross multiple instances. Password reset requests and OIDC tokens/states are also persisted in the database if the provider is shared. For shared data providers, scheduled event actions are only executed on a single SFTPGo instance by default, you can override this behavior on a per-action basis. The database table `shared_sessions` is used only to store temporary sessions. In performance critical installations, you might consider using a database-specific optimization, for example you might use an `UNLOGGED` table for PostgreSQL. This optimization in only required in very limited use cases. Default: `0`.
+  - `node`, struct. Node-specific configurations to allow inter-node communications. If your provider is shared across multiple nodes, the nodes can exchange information to present a uniform view for node-specific data. The current implementation allows to obtain active connections from all nodes. Nodes connect to each other using the REST API.
+    - `host`, string. IP address or hostname that other nodes can use to connect to this node via REST API. Empty means inter-node communications disabled. Default: empty.
+    - `port`, integer. The port that other nodes can use to connect to this node via REST API. Default: `0`
+    - `proto`, string. Supported values `http` or `https`. For `https` the configurations for http clients is used, so you can, for example, enable mutual TLS authentication. Default: `http`
   - `backups_path`, string. Path to the backup directory. This can be an absolute path or a path relative to the config dir. We don't allow backups in arbitrary paths for security reasons.
-  - `auto_backup`, struct. Defines the configuration for automatic data provider backups. Example: hour `0` and day_of_week `*` means a backup every day at midnight. The backup file name is in the format `backup_<day_of_week>_<hour>.json`, files with the same name will be overwritten. Note, this process will only backup provider data (users, folders, shares, admins, api keys) and will not backup the configuration file and users files.
-    - `enabled`, boolean. Set to `true` to enable automatic backups. Default: `true`.
-    - `hour`, string. Hour as standard cron expression. Allowed values: 0-23. Allowed special characters: asterisk (`*`), slash (`/`), comma (`,`), hyphen (`-`). More info about special characters [here](https://pkg.go.dev/github.com/robfig/cron#hdr-Special_Characters). Default: `0`.
-    - `day_of_week`, string. Day of week as standard cron expression. Allowed values: 0-6 (Sunday to Saturday). Allowed special characters: asterisk (`*`), slash (`/`), comma (`,`), hyphen (`-`),  question mark (`?`). More info about special characters [here](https://pkg.go.dev/github.com/robfig/cron#hdr-Special_Characters). Default: `*`.
 - **"httpd"**, the configuration for the HTTP server used to serve REST API and to expose the built-in web interface
   - `bindings`, list of structs. Each struct has the following fields:
     - `port`, integer. The port used for serving HTTP requests. Default: 8080.
     - `address`, string. Leave blank to listen on all available network interfaces. On *NIX you can specify an absolute path to listen on a Unix-domain socket Default: blank.
     - `enable_web_admin`, boolean. Set to `false` to disable the built-in web admin for this binding. You also need to define `templates_path` and `static_files_path` to use the built-in web admin interface. Default `true`.
     - `enable_web_client`, boolean. Set to `false` to disable the built-in web client for this binding. You also need to define `templates_path` and `static_files_path` to use the built-in web client interface. Default `true`.
+    - `enable_rest_api`, boolean. Set to `false` to disable REST API. Default `true`.
+    - `enabled_login_methods`, integer. Defines the login methods available for the WebAdmin and WebClient UIs. `0` means any configured method: username/password login form and OIDC, if enabled. `1` means OIDC for the WebAdmin UI. `2` means OIDC for the WebClient UI. `4` means login form for the WebAdmin UI. `8` means login form for the WebClient UI. You can combine the values. For example `3` means that you can only login using OIDC on both WebClient and WebAdmin UI. Default: `0`.
     - `enable_https`, boolean. Set to `true` and provide both a certificate and a key file to enable HTTPS connection for this binding. Default `false`.
     - `certificate_file`, string. Binding specific TLS certificate. This can be an absolute path or a path relative to the config dir.
     - `certificate_key_file`, string. Binding specific private key matching the above certificate. This can be an absolute path or a path relative to the config dir. If not set the global ones will be used, if any.
@@ -280,9 +289,10 @@ The configuration file contains the following sections:
       - `redirect_base_url`, string. Defines the base URL to redirect to after OpenID authentication. The suffix `/web/oidc/redirect` will be added to this base URL, adding also the `web_root` if configured. Default: blank.
       - `username_field`, string. Defines the ID token claims field to map to the SFTPGo username. Default: blank.
       - `scopes`, list of strings. Request the OAuth provider to provide the scope information from an authenticated users. The `openid` scope is mandatory. Default: `"openid", "profile", "email"`.
-      - `role_field`, string. Defines the optional ID token claims field to map to a SFTPGo role. If the defined ID token claims field is set to `admin` the authenticated user is mapped to an SFTPGo admin. You don't need to specify this field if you want to use OpenID only for the Web Client UI. Default: blank.
+      - `role_field`, string. Defines the optional ID token claims field to map to a SFTPGo role. If the defined ID token claims field is set to `admin` the authenticated user is mapped to an SFTPGo admin. You don't need to specify this field if you want to use OpenID only for the Web Client UI. If the field is inside a nested structure, you can use the dot notation to traverse the structures. Default: blank.
       - `implicit_roles`, boolean. If set, the `role_field` is ignored and the SFTPGo role is assumed based on the login link used. Default: `false`.
       - `custom_fields`, list of strings. Custom token claims fields to pass to the pre-login hook. Default: empty.
+      - `debug`, boolean. If set, the received id tokens will be logged at debug level. Default: `false`.
     - `security`, struct. Defines security headers to add to HTTP responses and allows to restrict allowed hosts. The following parameters are supported:
       - `enabled`, boolean. Set to `true` to enable security configurations. Default: `false`.
       - `allowed_hosts`, list of strings. Fully qualified domain names that are allowed. An empty list allows any and all host names. Default: empty.
@@ -328,9 +338,13 @@ The configuration file contains the following sections:
     - `exposed_headers`, list of strings.
     - `allow_credentials` boolean.
     - `max_age`, integer.
+    - `options_passthrough`, boolean.
+    - `options_success_status`, integer.
+    - `allow_private_network`, boolean.
   - `setup` struct containing configurations for the initial setup screen
     - `installation_code`, string. If set, this installation code will be required when creating the first admin account. Please note that even if set using an environment variable this field is read at SFTPGo startup and not at runtime. This is not a license key or similar, the purpose here is to prevent anyone who can access to the initial setup screen from creating an admin user. Default: blank.
     - `installation_code_hint`, string. Description for the installation code input field. Default: `Installation code`.
+  - `hide_support_link`, boolean. If set, the link to the [sponsors section](../README.md#sponsors) will not appear on the setup screen page. Default: `false`.
 - **"telemetry"**, the configuration for the telemetry server, more details [below](#telemetry-server)
   - `bind_port`, integer. The port used for serving HTTP requests. Set to 0 to disable HTTP server. Default: 0
   - `bind_address`, string. Leave blank to listen on all available network interfaces. On \*NIX you can specify an absolute path to listen on a Unix-domain socket. Default: `127.0.0.1`
@@ -360,7 +374,9 @@ The configuration file contains the following sections:
   - `commands`, list of structs. Allow to customize configuration per-command. Each struct has the following fields:
     - `path`, string. Define the command path as defined in the hook configuration
     - `timeout`, integer. This value overrides the global timeout if set
-    - `env`, list of strings. These values are added to the environment variables defined for all commands, if any
+    - `env`, list of strings. These values are added to the environment variables defined for all commands, if any. Default: empty
+    - `args`, list of strings. Arguments to pass to the command identified by `path`. Default: empty
+    - `hook`, string. If not empty this configuration only apply to the specified hook name. Supported hook names: `fs_actions`, `provider_actions`, `startup`, `post_connect`, `post_disconnect`, `data_retention`, `check_password`, `pre_login`, `post_login`, `external_auth`, `keyboard_interactive`. Default: empty
 - **kms**, configuration for the Key Management Service, more details can be found [here](./kms.md)
   - `secrets`
     - `url`, string. Defines the URI to the KMS service. Default: blank.
@@ -449,6 +465,13 @@ You can select `sha256-simd` setting the environment variable `SFTPGO_MINIO_SHA2
 
  `sha256-simd` is particularly useful if you have an Intel CPU with SHA extensions or an ARM CPU with Cryptography Extensions.
 
+The configuration file can change between different versions and merging your custom settings with the default configuration file, after updating SFTPGo, may be time-consuming. For this reason we suggest to set your custom settings using environment variables. This eliminates the need to merge your changes with the default configuration file after each update, you have to just check that your custom configuration keys still exists.
+
+Setting configuration options from environment variables is natural in Docker/Kubernetes.
+If you install SFTPGo on Linux using the official deb/rpm packages you can set your custom environment variables in the file `/etc/sftpgo/sftpgo.env` (create this file if it does not exist, it is defined as `EnvironmentFile` in the SFTPGo systemd unit).
+SFTPGo also reads files inside the `env.d` directory relative to config dir and then exports the valid variables into environment variables if they are not already set. With this method you can override any configuration options, set environment variables for SFTPGo plugins but you cannot set command flags because these files are read after that SFTPGo starts and the config dir must already be set.
+Of course you can also set environment variables with the method provided by the operating system of your choice.
+
 </details>
 
 <details><summary><font size=5>Binding to privileged ports</font></summary>
@@ -488,6 +511,7 @@ Supported hash algorithms:
 - PBKDF2 sha256 with base64 salt, prefix `$pbkdf2-b64salt-sha256$`
 - MD5 crypt, prefix `$1$`
 - MD5 crypt APR1, prefix `$apr1$`
+- SHA256 crypt, prefix `$5$`
 - SHA512 crypt, prefix `$6$`
 - LDAP MD5, prefix `{MD5}`
 

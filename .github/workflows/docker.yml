@@ -28,6 +28,9 @@ jobs:
           - os: ubuntu-latest
             docker_pkg: distroless
             optional_deps: false
+          - os: ubuntu-latest
+            docker_pkg: debian-plugins
+            optional_deps: true
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -64,6 +67,9 @@ jobs:
             VERSION="${VERSION}-distroless"
             VERSION_SLIM="${VERSION}-slim"
             DOCKERFILE=Dockerfile.distroless
+          elif [[ $DOCKER_PKG == debian-plugins ]]; then
+            VERSION="${VERSION}-plugins"
+            VERSION_SLIM="${VERSION}-slim"
           fi
           DOCKER_IMAGES=("drakkan/sftpgo" "ghcr.io/drakkan/sftpgo")
           TAGS="${DOCKER_IMAGES[0]}:${VERSION}"
@@ -89,6 +95,13 @@ jobs:
                 fi
                 TAGS="${TAGS},${DOCKER_IMAGE}:distroless"
                 TAGS_SLIM="${TAGS_SLIM},${DOCKER_IMAGE}:distroless-slim"
+              elif [[ $DOCKER_PKG == debian-plugins ]]; then
+                if [[ -n $MAJOR && -n $MINOR ]]; then
+                  TAGS="${TAGS},${DOCKER_IMAGE}:${MINOR}-plugins,${DOCKER_IMAGE}:${MAJOR}-plugins"
+                  TAGS_SLIM="${TAGS_SLIM},${DOCKER_IMAGE}:${MINOR}-plugins-slim,${DOCKER_IMAGE}:${MAJOR}-plugins-slim"
+                fi
+                TAGS="${TAGS},${DOCKER_IMAGE}:plugins"
+                TAGS_SLIM="${TAGS_SLIM},${DOCKER_IMAGE}:plugins-slim"
               else
                 if [[ -n $MAJOR && -n $MINOR ]]; then
                   TAGS="${TAGS},${DOCKER_IMAGE}:${MINOR}-alpine,${DOCKER_IMAGE}:${MAJOR}-alpine"
@@ -101,17 +114,22 @@ jobs:
           done
 
           if [[ $OPTIONAL_DEPS == true ]]; then
-            echo ::set-output name=version::${VERSION}
-            echo ::set-output name=tags::${TAGS}
-            echo ::set-output name=full::true
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+            echo "full=true" >> $GITHUB_OUTPUT
           else
-            echo ::set-output name=version::${VERSION_SLIM}
-            echo ::set-output name=tags::${TAGS_SLIM}
-            echo ::set-output name=full::false
+            echo "version=${VERSION_SLIM}" >> $GITHUB_OUTPUT
+            echo "tags=${TAGS_SLIM}" >> $GITHUB_OUTPUT
+            echo "full=false" >> $GITHUB_OUTPUT
           fi
-          echo ::set-output name=dockerfile::${DOCKERFILE}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          echo ::set-output name=sha::${GITHUB_SHA::8}
+          if [[ $DOCKER_PKG == debian-plugins ]]; then
+            echo "plugins=true" >> $GITHUB_OUTPUT
+          else
+            echo "plugins=false" >> $GITHUB_OUTPUT
+          fi
+          echo "dockerfile=${DOCKERFILE}" >> $GITHUB_OUTPUT
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
         env:
           DOCKER_PKG: ${{ matrix.docker_pkg }}
           OPTIONAL_DEPS: ${{ matrix.optional_deps }}
@@ -150,6 +168,8 @@ jobs:
           build-args: |
             COMMIT_SHA=${{ steps.info.outputs.sha }}
             INSTALL_OPTIONAL_PACKAGES=${{ steps.info.outputs.full }}
+            DOWNLOAD_PLUGINS=${{ steps.info.outputs.plugins }}
+            FEATURES=nopgxregisterdefaulttypes
           labels: |
             org.opencontainers.image.title=SFTPGo
             org.opencontainers.image.description=Fully featured and highly configurable SFTP server with optional HTTP, FTP/S and WebDAV support

@@ -7,14 +7,16 @@ SFTPGo supports two types of groups:
 - primary groups
 - secondary groups
 
-A user can be a member of a primary group and many secondary groups. Depending on the group type, the settings are inherited differently.
+A user can be a member of a primary group and many secondary and membership groups. Depending on the group type, the settings are inherited differently.
+
+:warning: SFTPGo groups are completely unrelated to system groups. Therefore, it is not necessary to add Linux/Windows groups to use SFTPGo groups.
 
 The following settings are inherited from the primary group:
 
 - home dir, if set for the group will replace the one defined for the user. The `%username%` placeholder is replaced with the username
 - filesystem config, if the provider set for the group is different from the "local provider" will replace the one defined for the user. The `%username%` placeholder is replaced with the username within the defined "prefix", for any vfs, and the "username" for the SFTP filesystem config
-- max sessions, quota size/files, upload/download bandwidth, upload/download/total data transfer, max upload size, external auth cache time: if they are set to `0` for the user they are replaced with the value set for the group, if different from `0`
-- TLS username, check password hook disabled, pre-login hook disabled, external auth hook disabled, filesystem checks disabled, allow API key authentication: if they are not set for the user they are replaced with the value set for the group
+- max sessions, quota size/files, upload/download bandwidth, upload/download/total data transfer, max upload size, external auth cache time, ftp_security, default share expiration: if they are set to `0` for the user they are replaced with the value set for the group, if different from `0`
+- TLS username, check password hook disabled, pre-login hook disabled, external auth hook disabled, filesystem checks disabled, allow API key authentication, anonymous user: if they are not set for the user they are replaced with the value set for the group
 - starting directory, if the user does not have a starting directory set, the value set for the group is used, if any. The `%username%` placeholder is replaced with the username
 
 The following settings are inherited from the primary and secondary groups:
@@ -27,7 +29,7 @@ The following settings are inherited from the primary and secondary groups:
 - two factor auth protocols
 - web client/REST API permissions
 
-The settings from the primary group are always merged first.
+The settings from the primary group are always merged first. no setting is inherited from "membership" groups.
 
 The final settings are a combination of the user settings and the group ones.
 For example you can define the following groups:

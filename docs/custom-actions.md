@@ -10,8 +10,10 @@ The `hook` can be defined as the absolute path of your program or an HTTP URL.
 The following `actions` are supported:
 
 - `download`
+- `first-download`
 - `pre-download`
 - `upload`
+- `first-upload`
 - `pre-upload`
 - `delete`
 - `pre-delete`
@@ -20,7 +22,7 @@ The following `actions` are supported:
 - `rmdir`
 - `ssh_cmd`
 
-The `upload` condition includes both uploads to new files and overwrite of existing ones. If an upload is aborted for quota limits SFTPGo tries to remove the partial file, so if the notification reports a zero size file and a quota exceeded error the file has been deleted. The `ssh_cmd` condition will be triggered after a command is successfully executed via SSH. `scp` will trigger the `download` and `upload` conditions and not `ssh_cmd`.
+The `upload` condition includes both uploads to new files and overwrite of existing ones. If an upload is aborted for quota limits SFTPGo tries to remove the partial file, so if the notification reports a zero size file and a quota exceeded error the file has been deleted. The `ssh_cmd` condition will be triggered after a command is successfully executed via SSH. `scp` will trigger the `download` and `upload` conditions and not `ssh_cmd`. The `first-download` and `first-upload` action are executed only if no error occour and they don't exclude the `download` and `upload` notifications, so you will get both the `first-upload` and `upload` notification after the first successful upload and the same for the first successful download.
 For cloud backends directories are virtual, they are created implicitly when you upload a file and are implicitly removed when the last file within a directory is removed. The `mkdir` and `rmdir` notifications are sent only when a directory is explicitly created or removed.
 
 The notification will indicate if an error is detected and so, for example, a partial file is uploaded.
@@ -43,7 +45,7 @@ If the `hook` defines a path to an external program, then this program can read 
 - `SFTPGO_ACTION_BUCKET`, non-empty for S3, GCS and Azure backends
 - `SFTPGO_ACTION_ENDPOINT`, non-empty for S3, SFTP and Azure backend if configured
 - `SFTPGO_ACTION_STATUS`, integer. Status for `upload`, `download` and `ssh_cmd` actions. 1 means no error, 2 means a generic error occurred, 3 means quota exceeded error
-- `SFTPGO_ACTION_PROTOCOL`, string. Possible values are `SSH`, `SFTP`, `SCP`, `FTP`, `DAV`, `HTTP`, `HTTPShare`, `OIDC`, `DataRetention`
+- `SFTPGO_ACTION_PROTOCOL`, string. Possible values are `SSH`, `SFTP`, `SCP`, `FTP`, `DAV`, `HTTP`, `HTTPShare`, `OIDC`, `DataRetention`, `EventAction`
 - `SFTPGO_ACTION_IP`, the action was executed from this IP address
 - `SFTPGO_ACTION_SESSION_ID`, string. Unique protocol session identifier. For stateless protocols such as HTTP the session id will change for each request
 - `SFTPGO_ACTION_OPEN_FLAGS`, integer. File open flags, can be non-zero for `pre-upload` action. If `SFTPGO_ACTION_FILE_SIZE` is greater than zero and `SFTPGO_ACTION_OPEN_FLAGS&512 == 0` the target file will not be truncated
@@ -62,11 +64,11 @@ If the `hook` defines an HTTP URL then this URL will be invoked as HTTP POST. Th
 - `virtual_target_path`, string, virtual target path, seen by SFTPGo users
 - `ssh_cmd`, string, included for `ssh_cmd` action
 - `file_size`, int64, included for `pre-upload`, `upload`, `download`, `delete` actions if the file size is greater than `0`
-- `fs_provider`, integer, `0` for local filesystem, `1` for S3 backend, `2` for Google Cloud Storage (GCS) backend, `3` for Azure Blob Storage backend, `4` for local encrypted backend, `5` for SFTP backend
+- `fs_provider`, integer, `0` for local filesystem, `1` for S3 backend, `2` for Google Cloud Storage (GCS) backend, `3` for Azure Blob Storage backend, `4` for local encrypted backend, `5` for SFTP backend, `6` for HTTPFs backend
 - `bucket`, string, included for S3, GCS and Azure backends
 - `endpoint`, string, included for S3, SFTP and Azure backend if configured
 - `status`, integer. Status for `upload`, `download` and `ssh_cmd` actions. 1 means no error, 2 means a generic error occurred, 3 means quota exceeded error
-- `protocol`, string. Possible values are `SSH`, `SFTP`, `SCP`, `FTP`, `DAV`, `HTTP`, `HTTPShare`, `OIDC`, `DataRetention`
+- `protocol`, string. Possible values are `SSH`, `SFTP`, `SCP`, `FTP`, `DAV`, `HTTP`, `HTTPShare`, `OIDC`, `DataRetention`, `EventAction`
 - `ip`, string. The action was executed from this IP address
 - `session_id`, string. Unique protocol session identifier. For stateless protocols such as HTTP the session id will change for each request
 - `open_flags`, integer. File open flags, can be non-zero for `pre-upload` action. If `file_size` is greater than zero and `file_size&512 == 0` the target file will not be truncated
@@ -85,8 +87,13 @@ The `actions` struct inside the `data_provider` configuration section allows you
 The supported object types are:
 
 - `user`
+- `folder`
+- `group`
 - `admin`
 - `api_key`
+- `share`
+- `event_action`
+- `event_rule`
 
 Actions will not be fired for internal updates, such as the last login or the user quota fields, or after external authentication.
 
