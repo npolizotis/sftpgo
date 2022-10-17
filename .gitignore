@@ -6,3 +6,4 @@ sftpgo.db
 nikos-sftp
 nikos-sftp.pub
 *.env
+.vscode
